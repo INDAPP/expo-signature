@@ -1,7 +1,4 @@
-export type ChangeEventPayload = {
-  value: string;
-};
-
-export type SignatureModuleViewProps = {
-  name: string;
+export type PublicKey = {
+  x: string;
+  y: string;
 };

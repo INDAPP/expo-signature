@@ -1,4 +1,5 @@
 PODS:
+  - BigInt (5.2.0)
   - boost (1.83.0)
   - DoubleConversion (1.1.6)
   - EXConstants (16.0.2):
@@ -1200,6 +1201,7 @@ PODS:
     - React-perflogger (= 0.74.2)
     - React-utils (= 0.74.2)
   - SignatureModule (0.1.0):
+    - BigInt (~> 5.0)
     - ExpoModulesCore
   - SocketRocket (0.7.0)
   - Yoga (0.0.0)
@@ -1272,6 +1274,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - BigInt
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -1402,6 +1405,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  BigInt: f668a80089607f521586bbe29513d708491ef2f7
   boost: d3f49c53809116a5d38da093a8aa78bf551aed09
   DoubleConversion: 76ab83afb40bddeeee456813d9c04f67f78771b5
   EXConstants: 409690fbfd5afea964e5e9d6c4eb2c2b59222c59
@@ -1462,7 +1466,7 @@ SPEC CHECKSUMS:
   React-runtimescheduler: 56b642bf605ba5afa500d35790928fc1d51565ad
   React-utils: 4476b7fcbbd95cfd002f3e778616155241d86e31
   ReactCommon: ecad995f26e0d1e24061f60f4e5d74782f003f12
-  SignatureModule: 3763871f6f414b247279902c67da0903a146fb64
+  SignatureModule: 0c440f425ebd5a586a8487b0c5b1a1d4b9f4e498
   SocketRocket: abac6f5de4d4d62d24e11868d7a2f427e0ef940d
   Yoga: ae3c32c514802d30f687a04a6a35b348506d411f
 
