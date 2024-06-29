@@ -17,6 +17,15 @@ public class SignatureModule: Module {
             }
         }
         
+        AsyncFunction("getEllipticCurvePublicKey") { (alias: String, promise: Promise) in
+            let key = getEllipticCurvePublicKey(alias: alias)
+            promise.resolve(key)
+        }
+        
+        AsyncFunction("isKeyPresentInKeychain") { (alias: String, promise: Promise) in
+            let isPresent = isKeyPresentInKeychain(alias: alias)
+            promise.resolve(isPresent)
+        }
     }
     
     private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
@@ -59,6 +68,49 @@ public class SignatureModule: Module {
         
         return try PublicKey(data: publicKeyData)
     }
+    
+    private func getEllipticCurvePublicKey(alias: String) -> PublicKey? {
+        let (status, item) = queryForKey(alias: alias)
+        
+        guard status == errSecSuccess else {
+            return nil
+        }
+        
+        let privateKey = item as! SecKey
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            return nil
+        }
+        
+        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as? Data else {
+            return nil
+        }
+        
+        return try? PublicKey(data: publicKeyData)
+    }
+    
+    private func isKeyPresentInKeychain(alias: String) -> Bool {
+        let (status, _) = queryForKey(alias: alias)
+        
+        return status == errSecSuccess
+    }
+    
+    private func queryForKey(alias: String) -> (OSStatus, CFTypeRef?) {
+        let tag = alias.data(using: .utf8)!
+        
+        let query: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationTag: tag,
+            kSecReturnRef: kCFBooleanTrue!,
+            kSecMatchLimit: kSecMatchLimitOne
+        ]
+        
+        var item: CFTypeRef?
+        
+        let status = SecItemCopyMatching(query, &item)
+        
+        return (status, item)
+    }
+    
 }
 
 enum SignatureError: Error {

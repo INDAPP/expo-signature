@@ -6,3 +6,13 @@ export async function generateEllipticCurveKeys(
 ): Promise<PublicKey> {
   return await SignatureModule.generateEllipticCurveKeys(alias);
 }
+
+export async function getEllipticCurvePublicKey(
+  alias: string,
+): Promise<PublicKey | null> {
+  return await SignatureModule.getEllipticCurvePublicKey(alias);
+}
+
+export async function isKeyPresentInKeychain(alias: string): Promise<boolean> {
+  return await SignatureModule.isKeyPresentInKeychain(alias);
+}

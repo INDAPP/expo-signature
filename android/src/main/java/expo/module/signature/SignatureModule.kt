@@ -7,6 +7,7 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.security.KeyPairGenerator
+import java.security.KeyStore
 import java.security.interfaces.ECPublicKey
 
 const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -23,6 +24,16 @@ class SignatureModule : Module() {
             } catch (e: Throwable) {
                 promise.reject(CodedException(e))
             }
+        }
+
+        AsyncFunction("getEllipticCurvePublicKey") { alias: String, promise: Promise ->
+            val key = getEllipticCurvePublicKey(alias)
+            promise.resolve(key)
+        }
+
+        AsyncFunction("isKeyPresentInKeychain") { alias: String, promise: Promise ->
+            val isPresent = isKeyPresentInKeychain(alias)
+            promise.resolve(isPresent)
         }
     }
 
@@ -47,5 +58,23 @@ class SignatureModule : Module() {
         return publicKey.w.run {
             PublicKey(affineX.toString(), affineY.toString())
         }
+    }
+
+    private fun getEllipticCurvePublicKey(alias: String): PublicKey? {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+
+        val publicKey = keyStore.getCertificate(alias)?.publicKey as? ECPublicKey
+
+        return publicKey?.w?.run {
+            PublicKey(affineX.toString(), affineY.toString())
+        }
+    }
+
+    private fun isKeyPresentInKeychain(alias: String): Boolean {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+
+        return keyStore.isKeyEntry(alias)
     }
 }
