@@ -32,16 +32,18 @@ public class SignatureModule: Module {
             throw error!.takeRetainedValue() as Error
         }
         
-        let attributes: NSDictionary = [
+        let attributes: NSMutableDictionary = [
             kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
             kSecAttrKeySizeInBits: kKeySize,
-            kSecAttrTokenID: kSecAttrTokenIDSecureEnclave,
             kSecPrivateKeyAttrs: [
                 kSecAttrIsPermanent: true,
                 kSecAttrApplicationTag: tag,
                 kSecAttrAccessControl: access
             ]
         ]
+#if !targetEnvironment(simulator)
+        attributes[kSecAttrTokenID] = kSecAttrTokenIDSecureEnclave
+#endif
         
         guard let privateKey = SecKeyCreateRandomKey(attributes, &error) else {
             throw error!.takeRetainedValue() as Error
