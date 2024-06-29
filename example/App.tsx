@@ -2,6 +2,7 @@ import {
   generateEllipticCurveKeys,
   getEllipticCurvePublicKey,
   isKeyPresentInKeychain,
+  deleteKey,
 } from "expo-signature";
 import { PublicKey } from "expo-signature/SignatureModule.types";
 import { useCallback, useState } from "react";
@@ -38,6 +39,7 @@ export default function App() {
       <Button title="Generate Key Pair" onPress={generateKeyPair} />
       <Button title="Retrieve key" onPress={retrieveKey} />
       <Button title={`Check key: ${isKeyPresent}`} onPress={checkKey} />
+      <Button title="Delete key" onPress={deleteKeyIfExists} />
     </View>
   );
 }

@@ -16,3 +16,7 @@ export async function getEllipticCurvePublicKey(
 export async function isKeyPresentInKeychain(alias: string): Promise<boolean> {
   return await SignatureModule.isKeyPresentInKeychain(alias);
 }
+
+export async function deleteKey(alias: string): Promise<boolean> {
+  return await SignatureModule.deleteKey(alias);
+}

@@ -26,6 +26,11 @@ public class SignatureModule: Module {
             let isPresent = isKeyPresentInKeychain(alias: alias)
             promise.resolve(isPresent)
         }
+        
+        AsyncFunction("deleteKey") { (alias: String, promise: Promise) in
+            let deleted = deleteKey(alias: alias)
+            promise.resolve(deleted)
+        }
     }
     
     private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
@@ -90,6 +95,19 @@ public class SignatureModule: Module {
     
     private func isKeyPresentInKeychain(alias: String) -> Bool {
         let (status, _) = queryForKey(alias: alias)
+        
+        return status == errSecSuccess
+    }
+    
+    private func deleteKey(alias: String) -> Bool {
+        let tag = alias.data(using: .utf8)!
+        
+        let query: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationTag: tag
+        ]
+        
+        let status = SecItemDelete(query)
         
         return status == errSecSuccess
     }

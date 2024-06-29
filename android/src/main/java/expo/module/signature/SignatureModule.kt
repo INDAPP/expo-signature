@@ -35,6 +35,11 @@ class SignatureModule : Module() {
             val isPresent = isKeyPresentInKeychain(alias)
             promise.resolve(isPresent)
         }
+
+        AsyncFunction("deleteKey") { alias: String, promise: Promise ->
+            val deleted = deleteKey(alias)
+            promise.resolve(deleted)
+        }
     }
 
     private fun generateEllipticCurveKeys(alias: String): PublicKey {
@@ -76,5 +81,17 @@ class SignatureModule : Module() {
         keyStore.load(null)
 
         return keyStore.isKeyEntry(alias)
+    }
+
+    private fun deleteKey(alias: String): Boolean {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+
+        if (keyStore.isKeyEntry(alias)) {
+            keyStore.deleteEntry(alias)
+            return true
+        } else {
+            return false
+        }
     }
 }
