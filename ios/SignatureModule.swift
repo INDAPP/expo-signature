@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import CryptoKit
 import BigInt
+import LocalAuthentication
 
 private let kKeySize = 256
 
@@ -31,6 +32,10 @@ public class SignatureModule: Module {
             let deleted = deleteKey(alias: alias)
             promise.resolve(deleted)
         }
+        
+        AsyncFunction("sign") { (data: Data, info: SignatureInfo, promise: Promise) in
+            sign(data: data, info: info, promise: promise)
+        }
     }
     
     private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
@@ -40,7 +45,7 @@ public class SignatureModule: Module {
         guard let access = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            .biometryAny,
+            [.privateKeyUsage, .biometryAny],
             &error
         ) else {
             throw error!.takeRetainedValue() as Error
@@ -112,15 +117,20 @@ public class SignatureModule: Module {
         return status == errSecSuccess
     }
     
-    private func queryForKey(alias: String) -> (OSStatus, CFTypeRef?) {
+    private func queryForKey(alias: String, context: LAContext? = nil) -> (OSStatus, CFTypeRef?) {
         let tag = alias.data(using: .utf8)!
         
-        let query: NSDictionary = [
+        let query: NSMutableDictionary = [
             kSecClass: kSecClassKey,
             kSecAttrApplicationTag: tag,
             kSecReturnRef: kCFBooleanTrue!,
-            kSecMatchLimit: kSecMatchLimitOne
+            kSecMatchLimit: kSecMatchLimitOne,
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
         ]
+        if let context = context {
+            query[kSecUseAuthenticationContext] = context
+        }
         
         var item: CFTypeRef?
         
@@ -129,8 +139,47 @@ public class SignatureModule: Module {
         return (status, item)
     }
     
+    private func sign(data: Data, info: SignatureInfo, promise: Promise) {
+        var contextError: NSError?
+        
+        let context = LAContext()
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &contextError) else {
+            promise.reject(SignatureError.cannotAuthenticateWithBiometry)
+            return
+        }
+        let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
+        context.localizedReason = reason
+        context.localizedCancelTitle = info.cancel
+        
+        let (status, item) = self.queryForKey(alias: info.alias)
+        
+        guard status == errSecSuccess else {
+            promise.reject(SignatureError.noKeyForThisAlias)
+            return
+        }
+        
+        let privateKey = item as! SecKey
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
+        
+        guard SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm) else {
+            promise.reject(SignatureError.unsupportedAlghoritm)
+            return
+        }
+        
+        var error: Unmanaged<CFError>?
+        guard let signature = SecKeyCreateSignature(privateKey, algorithm, data as CFData, &error) as Data? else {
+            promise.reject(error!.takeRetainedValue() as Error)
+            return
+        }
+        
+        promise.resolve(signature)
+        
+    }
 }
 
 enum SignatureError: Error {
     case noPublicKey
+    case noKeyForThisAlias
+    case unsupportedAlghoritm
+    case cannotAuthenticateWithBiometry
 }
