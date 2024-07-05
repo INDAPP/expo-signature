@@ -1,5 +1,6 @@
 package expo.module.signature
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricPrompt
@@ -17,6 +18,7 @@ import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
 import java.security.PrivateKey
 import java.security.Signature
+import java.security.SignatureException
 import java.security.UnrecoverableKeyException
 import java.security.interfaces.ECPublicKey
 
@@ -64,6 +66,11 @@ class SignatureModule : Module() {
         AsyncFunction("sign") { data: ByteArray, info: SignatureInfo, promise: Promise ->
             sign(data, info, promise)
         }
+
+        AsyncFunction("verify") {
+            data: ByteArray, signature: ByteArray, alias: String, promise: Promise ->
+            verify(data, signature, alias, promise)
+        }
     }
 
     private fun generateEllipticCurveKeys(alias: String): PublicKey {
@@ -75,8 +82,10 @@ class SignatureModule : Module() {
         ).run {
             setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
             setUserAuthenticationRequired(true)
-            //setInvalidatedByBiometricEnrollment(false)
             setKeySize(KEY_SIZE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                setInvalidatedByBiometricEnrollment(false)
+            }
             build()
         }
 
@@ -141,6 +150,27 @@ class SignatureModule : Module() {
 
         activity.runOnUiThread {
             prompt.authenticate(promptInfo, cryptoObject)
+        }
+    }
+
+    private fun verify(data: ByteArray, signature: ByteArray, alias: String, promise: Promise) {
+        try {
+            val key = keyStore.getCertificate(alias)?.publicKey as? ECPublicKey
+            val verified = Signature.getInstance("SHA256withECDSA").run {
+                initVerify(key)
+                update(data)
+                verify(signature)
+            }
+            promise.resolve(verified)
+        } catch (e: Exception) {
+            val exception = when (e) {
+                is KeyStoreException -> CodedException("Keystore not available", e)
+                is NoSuchAlgorithmException -> CodedException("Signature not available", e)
+                is InvalidKeyException -> CodedException("Invalid key", e)
+                is SignatureException -> CodedException("Signature error", e)
+                else -> CodedException("Unknown error", e)
+            }
+            promise.reject(exception)
         }
     }
 }

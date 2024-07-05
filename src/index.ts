@@ -27,3 +27,11 @@ export async function signData(
 ): Promise<Uint8Array> {
   return await SignatureModule.sign(data, info);
 }
+
+export async function verifyData(
+  data: Uint8Array,
+  signature: Uint8Array,
+  alias: string,
+): Promise<boolean> {
+  return await SignatureModule.verify(data, signature, alias);
+}
