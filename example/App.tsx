@@ -56,7 +56,7 @@ export default function App() {
     }
     const verified = await verifyData(data, signedData, keyTag);
     setVerified(verified);
-  }, [signData]);
+  }, [signedData]);
 
   return (
     <View style={styles.container}>

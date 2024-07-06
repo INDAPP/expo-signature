@@ -36,6 +36,10 @@ public class SignatureModule: Module {
         AsyncFunction("sign") { (data: Data, info: SignatureInfo, promise: Promise) in
             sign(data: data, info: info, promise: promise)
         }
+        
+        AsyncFunction("verify") { (data: Data, signature: Data, alias: String, promise: Promise) in
+            verify(data: data, signature: signature, alias: alias, promise: promise)
+        }
     }
     
     private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
@@ -140,13 +144,7 @@ public class SignatureModule: Module {
     }
     
     private func sign(data: Data, info: SignatureInfo, promise: Promise) {
-        var contextError: NSError?
-        
         let context = LAContext()
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &contextError) else {
-            promise.reject(SignatureError.cannotAuthenticateWithBiometry)
-            return
-        }
         let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
         context.localizedReason = reason
         context.localizedCancelTitle = info.cancel
@@ -175,11 +173,42 @@ public class SignatureModule: Module {
         promise.resolve(signature)
         
     }
+    
+    private func verify(data: Data, signature: Data, alias: String, promise: Promise) {
+        let (status, item) = queryForKey(alias: alias)
+        
+        guard status == errSecSuccess else {
+            promise.reject(SignatureError.noKeyForThisAlias)
+            return
+        }
+        
+        let privateKey = item as! SecKey
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            promise.reject(SignatureError.noPublicKey)
+            return
+        }
+        
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
+        
+        guard SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
+            promise.reject(SignatureError.unsupportedAlghoritm)
+            return
+        }
+        
+        var error: Unmanaged<CFError>?
+        let verified = SecKeyVerifySignature(publicKey, algorithm, data as CFData, signature as CFData, &error)
+        
+        if let error = error?.takeRetainedValue() as? Error {
+            promise.reject(error)
+            return
+        }
+        
+        promise.resolve(verified)
+    }
 }
 
 enum SignatureError: Error {
     case noPublicKey
     case noKeyForThisAlias
     case unsupportedAlghoritm
-    case cannotAuthenticateWithBiometry
 }
