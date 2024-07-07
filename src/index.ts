@@ -35,3 +35,10 @@ export async function verifyData(
 ): Promise<boolean> {
   return await SignatureModule.verify(data, signature, alias);
 }
+
+export async function addPublicKey(
+  key: PublicKey,
+  alias: string,
+): Promise<void> {
+  return await SignatureModule.addPublicKey(key, alias);
+}

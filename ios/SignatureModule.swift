@@ -40,6 +40,10 @@ public class SignatureModule: Module {
         AsyncFunction("verify") { (data: Data, signature: Data, alias: String, promise: Promise) in
             verify(data: data, signature: signature, alias: alias, promise: promise)
         }
+        
+        AsyncFunction("addPublicKey") { (publicKey: PublicKey, alias: String, promise: Promise) in
+            addPublicKey(publicKey: publicKey, alias: alias, promise: promise)
+        }
     }
     
     private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
@@ -130,7 +134,6 @@ public class SignatureModule: Module {
             kSecReturnRef: kCFBooleanTrue!,
             kSecMatchLimit: kSecMatchLimitOne,
             kSecAttrKeyType: kSecAttrKeyTypeEC,
-            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
         ]
         if let context = context {
             query[kSecUseAuthenticationContext] = context
@@ -205,10 +208,56 @@ public class SignatureModule: Module {
         
         promise.resolve(verified)
     }
+    
+    private func addPublicKey(publicKey: PublicKey, alias: String, promise: Promise) {
+        guard let data = publicKey.coordinatesAsData() else {
+            promise.reject(SignatureError.invalidPublicKeyFormat)
+            return
+        }
+        
+        let parameters: NSDictionary = [
+            kSecAttrKeyType: kSecAttrKeyTypeEC,
+            kSecAttrKeyClass: kSecAttrKeyClassPublic,
+            kSecAttrKeySizeInBits: kKeySize,
+            kSecAttrIsPermanent: true,
+        ]
+        
+        var error: Unmanaged<CFError>?
+        guard let publicKey = SecKeyCreateWithData(
+            data as CFData,
+            parameters as CFDictionary,
+            &error
+        ) else {
+            promise.reject(error!.takeRetainedValue())
+            return
+        }
+        
+        let tag = alias.data(using: .utf8)!
+        let attributes: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationTag: tag,
+            kSecAttrKeyType: kSecAttrKeyTypeEC,
+            kSecAttrKeyClass: kSecAttrKeyClassPublic,
+            kSecValueRef: publicKey,
+        ]
+        
+        var status = SecItemAdd(attributes as CFDictionary, nil)
+        if (status == errSecDuplicateItem && deleteKey(alias: alias)) {
+            status = SecItemAdd(attributes as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else {
+            promise.reject(SignatureError.keyNotAdded)
+            return
+        }
+        
+        promise.resolve()
+    }
 }
 
 enum SignatureError: Error {
     case noPublicKey
     case noKeyForThisAlias
     case unsupportedAlghoritm
+    case invalidPublicKeyFormat
+    case keyNotAdded
 }

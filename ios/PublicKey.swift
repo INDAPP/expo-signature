@@ -27,6 +27,17 @@ struct PublicKey: Record {
         x = BigUInt(xData).description
         y = BigUInt(yData).description
     }
+    
+    func coordinatesAsData() -> Data? {
+        guard let xInt = BigInt(x),
+              let yInt = BigInt(y) else {
+            return nil
+        }
+        var data = Data([0x04])
+        data.append(xInt.magnitude.serialize())
+        data.append(yInt.magnitude.serialize())
+        return Data(data)
+    }
 }
 
 enum PublicKeyError: Error {

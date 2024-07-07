@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import {
   generateEllipticCurveKeys,
   getEllipticCurvePublicKey,
@@ -5,12 +6,14 @@ import {
   deleteKey,
   signData,
   verifyData,
+  addPublicKey,
 } from "expo-signature";
 import { PublicKey } from "expo-signature/SignatureModule.types";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button, StyleSheet, Text, View } from "react-native";
 
 const keyTag = "test_ecc_key";
+const keyImportedTag = "test_ecc_key_imported";
 
 const data = stringToUint8Array("Hello World!");
 
@@ -19,6 +22,7 @@ export default function App() {
   const [isKeyPresent, setIsKeyPresent] = useState<boolean>();
   const [signedData, setSignedData] = useState<Uint8Array>();
   const [verified, setVerified] = useState<boolean>();
+  const [clipboardVerification, setClipboardVerification] = useState<string>();
 
   const generateKeyPair = useCallback(async () => {
     const publicKey = await generateEllipticCurveKeys(keyTag);
@@ -58,10 +62,64 @@ export default function App() {
     setVerified(verified);
   }, [signedData]);
 
+  const copyPublicKey = useCallback(() => {
+    Clipboard.setStringAsync(JSON.stringify(publicKey));
+  }, [publicKey]);
+
+  const copySignature = useCallback(() => {
+    if (!signedData) {
+      return;
+    }
+    const stringData = uInt8ArrayToHexString(signedData);
+    Clipboard.setStringAsync(stringData);
+  }, [signedData]);
+
+  const publicKeyContent = useMemo(() => {
+    if (!publicKey) {
+      return null;
+    }
+    return `Public key:\n${JSON.stringify(publicKey, null, 2)}`;
+  }, [publicKey]);
+
+  const signatureContent = useMemo(() => {
+    if (!signedData) {
+      return null;
+    }
+    return `Signature:\n${uInt8ArrayToHexString(signedData)}`;
+  }, [signedData]);
+
+  const addKeyFromClipboard = useCallback(async () => {
+    const clipboard = await Clipboard.getStringAsync();
+    console.log("Clipboard data:", clipboard);
+    const json = JSON.parse(clipboard);
+    if ("x" in json && "y" in json) {
+      const publicKey = json as PublicKey;
+      try {
+        await addPublicKey(publicKey, keyImportedTag);
+        setPublicKey(publicKey);
+      } catch (e) {
+        console.log(e, publicKey);
+        setPublicKey(null);
+      }
+    }
+  }, []);
+
+  const verifySignatureFromClipboard = useCallback(async () => {
+    const clipboard = await Clipboard.getStringAsync();
+    const signature = hexStringToUint8Array(clipboard);
+    console.log(uInt8ArrayToHexString(signature));
+    const verified = await verifyData(data, signature, keyImportedTag);
+    setClipboardVerification(
+      `${uInt8ArrayToHexString(signature)}\n\nVerified: ${verified}`,
+    );
+  }, []);
+
   return (
     <View style={styles.container}>
-      <Text>{JSON.stringify(publicKey, null, 2)}</Text>
-      <Text>{signedData && uInt8ArrayToHexString(signedData)}</Text>
+      <Text>{publicKeyContent}</Text>
+      {publicKey && <Button title="Copy key" onPress={copyPublicKey} />}
+      <Text>{signatureContent}</Text>
+      {signedData && <Button title="Copy signature" onPress={copySignature} />}
       <Button title="Generate Key Pair" onPress={generateKeyPair} />
       <Button title="Retrieve key" onPress={retrieveKey} />
       <Button title={`Check key: ${isKeyPresent}`} onPress={checkKey} />
@@ -69,6 +127,12 @@ export default function App() {
       <Button title="Sign data" onPress={sign} />
       <Button title="Verify data" onPress={verify} />
       <Text>{verified ? "Data verified succesfully" : "Not yet verified"}</Text>
+      <Button title="Add key from Clipboard" onPress={addKeyFromClipboard} />
+      <Button
+        title="Verify signature from Clipboard"
+        onPress={verifySignatureFromClipboard}
+      />
+      <Text>{clipboardVerification}</Text>
     </View>
   );
 }
@@ -89,8 +153,17 @@ function stringToUint8Array(str: string): Uint8Array {
   return encoder.encode(str);
 }
 
+// function uInt8ArrayToString(data: Uint8Array): string {
+//   const decoder = new TextDecoder();
+//   return decoder.decode(data);
+// }
+
 function uInt8ArrayToHexString(data: Uint8Array): string {
   return Array.from(data)
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join(":");
+}
+
+function hexStringToUint8Array(str: string): Uint8Array {
+  return new Uint8Array(str.split(":").map((byte) => parseInt(byte, 16)));
 }
