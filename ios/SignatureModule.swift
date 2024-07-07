@@ -56,7 +56,7 @@ public class SignatureModule: Module {
         }
         
         let attributes: NSMutableDictionary = [
-            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyType: kSecAttrKeyTypeEC,
             kSecAttrKeySizeInBits: kKeySize,
             kSecPrivateKeyAttrs: [
                 kSecAttrIsPermanent: true,
@@ -129,7 +129,7 @@ public class SignatureModule: Module {
             kSecAttrApplicationTag: tag,
             kSecReturnRef: kCFBooleanTrue!,
             kSecMatchLimit: kSecMatchLimitOne,
-            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyType: kSecAttrKeyTypeEC,
             kSecAttrKeyClass: kSecAttrKeyClassPrivate,
         ]
         if let context = context {
