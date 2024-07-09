@@ -6,14 +6,13 @@ import {
   deleteKey,
   signData,
   verifyData,
-  addPublicKey,
+  verifyWithKey,
 } from "expo-signature";
 import { PublicKey } from "expo-signature/SignatureModule.types";
 import { useCallback, useMemo, useState } from "react";
 import { Button, StyleSheet, Text, View } from "react-native";
 
 const keyTag = "test_ecc_key";
-const keyImportedTag = "test_ecc_key_imported";
 
 const data = stringToUint8Array("Hello World!");
 
@@ -22,7 +21,6 @@ export default function App() {
   const [isKeyPresent, setIsKeyPresent] = useState<boolean>();
   const [signedData, setSignedData] = useState<Uint8Array>();
   const [verified, setVerified] = useState<boolean>();
-  const [clipboardVerification, setClipboardVerification] = useState<string>();
 
   const generateKeyPair = useCallback(async () => {
     const publicKey = await generateEllipticCurveKeys(keyTag);
@@ -62,6 +60,15 @@ export default function App() {
     setVerified(verified);
   }, [signedData]);
 
+  const verifyWithoutKeychain = useCallback(async () => {
+    if (!signedData || !publicKey) {
+      setVerified(undefined);
+      return;
+    }
+    const verified = await verifyWithKey(data, signedData, publicKey);
+    setVerified(verified);
+  }, [signedData, publicKey]);
+
   const copyPublicKey = useCallback(() => {
     Clipboard.setStringAsync(JSON.stringify(publicKey));
   }, [publicKey]);
@@ -88,32 +95,6 @@ export default function App() {
     return `Signature:\n${uInt8ArrayToHexString(signedData)}`;
   }, [signedData]);
 
-  const addKeyFromClipboard = useCallback(async () => {
-    const clipboard = await Clipboard.getStringAsync();
-    console.log("Clipboard data:", clipboard);
-    const json = JSON.parse(clipboard);
-    if ("x" in json && "y" in json) {
-      const publicKey = json as PublicKey;
-      try {
-        await addPublicKey(publicKey, keyImportedTag);
-        setPublicKey(publicKey);
-      } catch (e) {
-        console.log(e, publicKey);
-        setPublicKey(null);
-      }
-    }
-  }, []);
-
-  const verifySignatureFromClipboard = useCallback(async () => {
-    const clipboard = await Clipboard.getStringAsync();
-    const signature = hexStringToUint8Array(clipboard);
-    console.log(uInt8ArrayToHexString(signature));
-    const verified = await verifyData(data, signature, keyImportedTag);
-    setClipboardVerification(
-      `${uInt8ArrayToHexString(signature)}\n\nVerified: ${verified}`,
-    );
-  }, []);
-
   return (
     <View style={styles.container}>
       <Text>{publicKeyContent}</Text>
@@ -126,13 +107,8 @@ export default function App() {
       <Button title="Delete key" onPress={deleteKeyIfExists} />
       <Button title="Sign data" onPress={sign} />
       <Button title="Verify data" onPress={verify} />
+      <Button title="Verify with key" onPress={verifyWithoutKeychain} />
       <Text>{verified ? "Data verified succesfully" : "Not yet verified"}</Text>
-      <Button title="Add key from Clipboard" onPress={addKeyFromClipboard} />
-      <Button
-        title="Verify signature from Clipboard"
-        onPress={verifySignatureFromClipboard}
-      />
-      <Text>{clipboardVerification}</Text>
     </View>
   );
 }
@@ -164,6 +140,6 @@ function uInt8ArrayToHexString(data: Uint8Array): string {
     .join(":");
 }
 
-function hexStringToUint8Array(str: string): Uint8Array {
-  return new Uint8Array(str.split(":").map((byte) => parseInt(byte, 16)));
-}
+// function hexStringToUint8Array(str: string): Uint8Array {
+//   return new Uint8Array(str.split(":").map((byte) => parseInt(byte, 16)));
+// }

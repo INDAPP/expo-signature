@@ -36,9 +36,10 @@ export async function verifyData(
   return await SignatureModule.verify(data, signature, alias);
 }
 
-export async function addPublicKey(
+export async function verifyWithKey(
+  data: Uint8Array,
+  signature: Uint8Array,
   key: PublicKey,
-  alias: string,
-): Promise<void> {
-  return await SignatureModule.addPublicKey(key, alias);
+): Promise<boolean> {
+  return await SignatureModule.verifyWithKey(data, signature, key);
 }

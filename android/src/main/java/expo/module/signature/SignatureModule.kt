@@ -11,11 +11,8 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import org.bouncycastle.x509.X509V3CertificateGenerator
-import java.lang.IllegalStateException
 import java.math.BigInteger
 import java.security.AlgorithmParameters
-import java.security.InvalidAlgorithmParameterException
 import java.security.InvalidKeyException
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
@@ -23,20 +20,15 @@ import java.security.KeyStore
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
 import java.security.PrivateKey
-import java.security.SecureRandom
 import java.security.Signature
 import java.security.SignatureException
 import java.security.UnrecoverableKeyException
-import java.security.cert.CertificateEncodingException
-import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
-import java.util.Date
-import javax.security.auth.x500.X500Principal
-import kotlin.jvm.Throws
+import java.security.spec.InvalidParameterSpecException
 
 
 const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -91,9 +83,9 @@ class SignatureModule : Module() {
             verify(data, signature, alias, promise)
         }
 
-        AsyncFunction("addPublicKey") {
-            publicKey: PublicKey, alias: String, promise: Promise ->
-            addPublicKey(publicKey, alias, promise)
+        AsyncFunction("verifyWithKey") {
+                data: ByteArray, signature: ByteArray, publicKey: PublicKey, promise: Promise ->
+            verifyWithKey(data, signature, publicKey, promise)
         }
     }
 
@@ -198,9 +190,9 @@ class SignatureModule : Module() {
         }
     }
 
-    private fun addPublicKey(publicKey: PublicKey, alias: String, promise: Promise) {
-        val xInt = BigInteger(publicKey.x, 10)
-        val yInt = BigInteger(publicKey.y, 10)
+    private fun verifyWithKey(data: ByteArray, signature: ByteArray, publicKey: PublicKey, promise: Promise) {
+        val xInt = BigInteger(publicKey.x)
+        val yInt = BigInteger(publicKey.y)
         val ecPoint = ECPoint(xInt, yInt)
 
         try {
@@ -213,54 +205,23 @@ class SignatureModule : Module() {
 
             val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
             val key = keyFactory.generatePublic(publicKeySpec)
-            /// public key can't be added to KeyStore, so we need to generate a self-signed certificate
-            val certificate = generateSelfSignedCertificate(key)
 
-            keyStore.setCertificateEntry(alias, certificate)
-            promise.resolve()
+            val verified = Signature.getInstance(SIGNATURE_ALGORITHM).run {
+                initVerify(key)
+                update(data)
+                verify(signature)
+            }
+            promise.resolve(verified)
         } catch (e: Exception) {
             val exception = when (e) {
-                is KeyStoreException -> CodedException("Keystore not available", e)
                 is NoSuchAlgorithmException -> CodedException("Signature not available", e)
                 is InvalidKeyException -> CodedException("Invalid key", e)
-                is InvalidAlgorithmParameterException -> CodedException("Invalid algorithm parameter", e)
-                is CertificateEncodingException -> CodedException("Certificate encoding error", e)
-                is IllegalStateException -> CodedException("Illegal state", e)
                 is SignatureException -> CodedException("Signature error", e)
+                is InvalidParameterSpecException -> CodedException("Invalid parameter spec", e)
                 else -> CodedException("Unknown error", e)
             }
-            return promise.reject(exception)
+            promise.reject(exception)
         }
-    }
-
-    @Throws(NoSuchAlgorithmException::class, InvalidAlgorithmParameterException::class,
-        CertificateEncodingException::class, IllegalStateException::class,
-        SignatureException::class, InvalidKeyException::class)
-    private fun generateSelfSignedCertificate(publicKey: java.security.PublicKey): X509Certificate {
-        val now = System.currentTimeMillis()
-        val startDate = Date(now)
-        val endDate = Date(now + 10L * 365L * 24L * 60L * 60L * 1000L) // 10 year
-
-        val dnName = X500Principal("CN=Test, O=Test, C=Test")
-        val serialNumber = BigInteger(64, SecureRandom())
-
-        val certGen = X509V3CertificateGenerator().apply {
-            setSerialNumber(serialNumber)
-            setIssuerDN(dnName)
-            setNotBefore(startDate)
-            setNotAfter(endDate)
-            setSubjectDN(dnName)
-            setPublicKey(publicKey)
-            setSignatureAlgorithm(SIGNATURE_ALGORITHM)
-        }
-
-        val keyPair = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC).run {
-            initialize(ECGenParameterSpec(CURVE_SPEC))
-            generateKeyPair()
-        }
-
-        val signingKey = keyPair.private
-        return certGen.generate(signingKey)
     }
 
 }

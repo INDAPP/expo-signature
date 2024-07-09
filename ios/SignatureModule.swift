@@ -41,8 +41,8 @@ public class SignatureModule: Module {
             verify(data: data, signature: signature, alias: alias, promise: promise)
         }
         
-        AsyncFunction("addPublicKey") { (publicKey: PublicKey, alias: String, promise: Promise) in
-            addPublicKey(publicKey: publicKey, alias: alias, promise: promise)
+        AsyncFunction("verifyWithKey") { (data: Data, signature: Data, publicKey: PublicKey, promise: Promise) in
+            verifyWithKey(data: data, signature: signature, publicKey: publicKey, promise: promise)
         }
     }
     
@@ -209,8 +209,8 @@ public class SignatureModule: Module {
         promise.resolve(verified)
     }
     
-    private func addPublicKey(publicKey: PublicKey, alias: String, promise: Promise) {
-        guard let data = publicKey.coordinatesAsData() else {
+    private func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey, promise: Promise) {
+        guard let keyData = publicKey.coordinatesAsData() else {
             promise.reject(SignatureError.invalidPublicKeyFormat)
             return
         }
@@ -219,12 +219,11 @@ public class SignatureModule: Module {
             kSecAttrKeyType: kSecAttrKeyTypeEC,
             kSecAttrKeyClass: kSecAttrKeyClassPublic,
             kSecAttrKeySizeInBits: kKeySize,
-            kSecAttrIsPermanent: true,
         ]
         
         var error: Unmanaged<CFError>?
-        guard let publicKey = SecKeyCreateWithData(
-            data as CFData,
+        guard let key = SecKeyCreateWithData(
+            keyData as CFData,
             parameters as CFDictionary,
             &error
         ) else {
@@ -232,26 +231,23 @@ public class SignatureModule: Module {
             return
         }
         
-        let tag = alias.data(using: .utf8)!
-        let attributes: NSDictionary = [
-            kSecClass: kSecClassKey,
-            kSecAttrApplicationTag: tag,
-            kSecAttrKeyType: kSecAttrKeyTypeEC,
-            kSecAttrKeyClass: kSecAttrKeyClassPublic,
-            kSecValueRef: publicKey,
-        ]
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
-        var status = SecItemAdd(attributes as CFDictionary, nil)
-        if (status == errSecDuplicateItem && deleteKey(alias: alias)) {
-            status = SecItemAdd(attributes as CFDictionary, nil)
-        }
-        guard status == errSecSuccess else {
-            promise.reject(SignatureError.keyNotAdded)
+        guard SecKeyIsAlgorithmSupported(key, .verify, algorithm) else {
+            promise.reject(SignatureError.unsupportedAlghoritm)
             return
         }
         
-        promise.resolve()
+        let verified = SecKeyVerifySignature(key, algorithm, data as CFData, signature as CFData, &error)
+        
+        if let error = error?.takeRetainedValue() as? Error {
+            promise.reject(error)
+            return
+        }
+        
+        promise.resolve(verified)
     }
+    
 }
 
 enum SignatureError: Error {
