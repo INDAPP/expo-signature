@@ -13,22 +13,16 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.math.BigInteger
 import java.security.AlgorithmParameters
-import java.security.InvalidKeyException
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.KeyStoreException
-import java.security.NoSuchAlgorithmException
 import java.security.PrivateKey
 import java.security.Signature
-import java.security.SignatureException
-import java.security.UnrecoverableKeyException
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
-import java.security.spec.InvalidParameterSpecException
 
 
 const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -50,96 +44,94 @@ class SignatureModule : Module() {
             )
         }
 
-        AsyncFunction("generateEllipticCurveKeys") { alias: String, promise: Promise ->
-            try {
-                val key = generateEllipticCurveKeys(alias)
-                promise.resolve(key)
-            } catch (e: Throwable) {
-                promise.reject(CodedException(e))
-            }
-        }
+        AsyncFunction("generateEllipticCurveKeys", this@SignatureModule::generateEllipticCurveKeys)
 
-        AsyncFunction("getEllipticCurvePublicKey") { alias: String, promise: Promise ->
-            val key = getEllipticCurvePublicKey(alias)
+        AsyncFunction("getEllipticCurvePublicKey", this@SignatureModule::getEllipticCurvePublicKey)
+
+        AsyncFunction("isKeyPresentInKeychain", this@SignatureModule::isKeyPresentInKeychain)
+
+        AsyncFunction("deleteKey", this@SignatureModule::deleteKey)
+
+        AsyncFunction("sign", this@SignatureModule::sign)
+
+        AsyncFunction("verify", this@SignatureModule::verify)
+
+        AsyncFunction("verifyWithKey", this@SignatureModule::verifyWithKey)
+    }
+
+    private fun generateEllipticCurveKeys(alias: String, promise: Promise) {
+        try {
+            val generator = KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE
+            )
+            val parameterSpec = KeyGenParameterSpec.Builder(
+                alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+            ).run {
+                setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+                setUserAuthenticationRequired(true)
+                setKeySize(KEY_SIZE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    setInvalidatedByBiometricEnrollment(false)
+                }
+                build()
+            }
+
+            generator.initialize(parameterSpec)
+            val keyPair = generator.generateKeyPair()
+            val publicKey = (keyPair.public as ECPublicKey).w.run {
+                PublicKey(affineX.toString(), affineY.toString())
+            }
+            promise.resolve(publicKey)
+        } catch (e: Exception) {
+            val error = SignatureError.fromException(e)
+            promise.reject(error.code, e.message, e)
+        }
+    }
+
+    private fun getEllipticCurvePublicKey(alias: String, promise: Promise) {
+        try {
+            val publicKey = keyStore.getCertificate(alias)?.publicKey as? ECPublicKey
+            val key = publicKey?.w?.run {
+                PublicKey(affineX.toString(), affineY.toString())
+            }
+
             promise.resolve(key)
+        } catch (e: Exception) {
+            val error = SignatureError.fromException(e)
+            promise.reject(error.code, e.message, e)
         }
+    }
 
-        AsyncFunction("isKeyPresentInKeychain") { alias: String, promise: Promise ->
-            val isPresent = isKeyPresentInKeychain(alias)
+    private fun isKeyPresentInKeychain(alias: String, promise: Promise) {
+        try {
+            val isPresent = keyStore.isKeyEntry(alias)
             promise.resolve(isPresent)
-        }
-
-        AsyncFunction("deleteKey") { alias: String, promise: Promise ->
-            val deleted = deleteKey(alias)
-            promise.resolve(deleted)
-        }
-
-        AsyncFunction("sign") { data: ByteArray, info: SignatureInfo, promise: Promise ->
-            sign(data, info, promise)
-        }
-
-        AsyncFunction("verify") {
-            data: ByteArray, signature: ByteArray, alias: String, promise: Promise ->
-            verify(data, signature, alias, promise)
-        }
-
-        AsyncFunction("verifyWithKey") {
-                data: ByteArray, signature: ByteArray, publicKey: PublicKey, promise: Promise ->
-            verifyWithKey(data, signature, publicKey, promise)
+        } catch (e: Exception) {
+            val error = SignatureError.fromException(e)
+            promise.reject(error.code, e.message, e)
         }
     }
 
-    private fun generateEllipticCurveKeys(alias: String): PublicKey {
-        val generator = KeyPairGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE
-        )
-        val parameterSpec = KeyGenParameterSpec.Builder(
-            alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-        ).run {
-            setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-            setUserAuthenticationRequired(true)
-            setKeySize(KEY_SIZE)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                setInvalidatedByBiometricEnrollment(false)
+    private fun deleteKey(alias: String, promise: Promise) {
+        try {
+            val keyStore = this.keyStore
+
+            if (keyStore.isKeyEntry(alias)) {
+                keyStore.deleteEntry(alias)
+                promise.resolve(true)
+            } else {
+                promise.resolve(false)
             }
-            build()
-        }
-
-        generator.initialize(parameterSpec)
-        val keyPair = generator.generateKeyPair()
-        val publicKey = keyPair.public as ECPublicKey
-        return publicKey.w.run {
-            PublicKey(affineX.toString(), affineY.toString())
-        }
-    }
-
-    private fun getEllipticCurvePublicKey(alias: String): PublicKey? {
-        val publicKey = keyStore.getCertificate(alias)?.publicKey as? ECPublicKey
-
-        return publicKey?.w?.run {
-            PublicKey(affineX.toString(), affineY.toString())
-        }
-    }
-
-    private fun isKeyPresentInKeychain(alias: String): Boolean {
-        return keyStore.isKeyEntry(alias)
-    }
-
-    private fun deleteKey(alias: String): Boolean {
-        val keyStore = this.keyStore
-
-        if (keyStore.isKeyEntry(alias)) {
-            keyStore.deleteEntry(alias)
-            return true
-        } else {
-            return false
+        } catch (e: Exception) {
+            val error = SignatureError.fromException(e)
+            promise.reject(error.code, e.message, e)
         }
     }
 
     private fun sign(data: ByteArray, info: SignatureInfo, promise: Promise) {
         val activity =
             mActivityProvider.currentActivity as? FragmentActivity ?: return promise.reject(
-                CodedException("Not a FragmentActivity")
+                CodedException(SignatureError.SIGNATURE_ERROR.code, "Not a FragmentActivity", null)
             )
         val executor = ContextCompat.getMainExecutor(activity)
         val callback = BiometricAuthenticationCallback(data, promise)
@@ -151,14 +143,8 @@ class SignatureModule : Module() {
                 initSign(key)
             }
         } catch (e: Exception) {
-            val exception = when (e) {
-                is KeyStoreException -> CodedException("Keystore not available", e)
-                is NoSuchAlgorithmException -> CodedException("Signature not available", e)
-                is UnrecoverableKeyException -> CodedException("Key not available", e)
-                is InvalidKeyException -> CodedException("Invalid key", e)
-                else -> CodedException("Unknown error", e)
-            }
-            return promise.reject(exception)
+            val error = SignatureError.fromException(e)
+            return promise.reject(error.code, e.message, e)
         }
 
         val cryptoObject = BiometricPrompt.CryptoObject(signature)
@@ -179,14 +165,8 @@ class SignatureModule : Module() {
             }
             promise.resolve(verified)
         } catch (e: Exception) {
-            val exception = when (e) {
-                is KeyStoreException -> CodedException("Keystore not available", e)
-                is NoSuchAlgorithmException -> CodedException("Signature not available", e)
-                is InvalidKeyException -> CodedException("Invalid key", e)
-                is SignatureException -> CodedException("Signature error", e)
-                else -> CodedException("Unknown error", e)
-            }
-            promise.reject(exception)
+            val error = SignatureError.fromException(e)
+            return promise.reject(error.code, e.message, e)
         }
     }
 
@@ -213,14 +193,8 @@ class SignatureModule : Module() {
             }
             promise.resolve(verified)
         } catch (e: Exception) {
-            val exception = when (e) {
-                is NoSuchAlgorithmException -> CodedException("Signature not available", e)
-                is InvalidKeyException -> CodedException("Invalid key", e)
-                is SignatureException -> CodedException("Signature error", e)
-                is InvalidParameterSpecException -> CodedException("Invalid parameter spec", e)
-                else -> CodedException("Unknown error", e)
-            }
-            promise.reject(exception)
+            val error = SignatureError.fromException(e)
+            return promise.reject(error.code, e.message, e)
         }
     }
 

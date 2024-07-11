@@ -10,26 +10,27 @@ class BiometricAuthenticationCallback(private val data: ByteArray, private val p
 
     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
         val signature = result.cryptoObject?.signature ?: return promise.reject(
-            CodedException("Signature not available")
+            CodedException(SignatureError.SIGNATURE_ERROR.code, "Signature not available", null)
         )
         try {
             signature.update(data)
             val signedData = signature.sign()
             promise.resolve(signedData)
         } catch (e: Exception) {
-            val exception = when (e) {
-                is SignatureException -> CodedException("Signature error", e)
-                else -> CodedException("Unknown error", e)
-            }
-            promise.reject(exception)
+            val error = SignatureError.fromException(e)
+            promise.reject(error.code, e.message, e)
         }
     }
 
     override fun onAuthenticationFailed() {
-        promise.reject(CodedException("Unrecognized user"))
+        promise.reject(
+            CodedException(SignatureError.SIGNATURE_ERROR.code, "Unrecognized user", null)
+        )
     }
 
     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-        promise.reject(CodedException(errorCode.toString(), errString.toString(), null))
+        promise.reject(
+            CodedException(SignatureError.SIGNATURE_ERROR.code, "Authentication failed with code $errorCode: $errString", null)
+        )
     }
 }

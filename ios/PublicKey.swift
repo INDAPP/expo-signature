@@ -36,6 +36,9 @@ struct PublicKey: Record {
         var data = Data([0x04])
         data.append(xInt.magnitude.serialize())
         data.append(yInt.magnitude.serialize())
+        guard data.count == 65 else {
+            return nil
+        }
         return Data(data)
     }
 }

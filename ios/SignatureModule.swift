@@ -9,44 +9,22 @@ public class SignatureModule: Module {
     public func definition() -> ModuleDefinition {
         Name("ExpoSignature")
         
-        AsyncFunction("generateEllipticCurveKeys") { (alias: String, promise: Promise) in
-            do {
-                let key = try generateEllipticCurveKeys(alias: alias)
-                promise.resolve(key)
-            } catch let error {
-                promise.reject(error)
-            }
-        }
+        AsyncFunction("generateEllipticCurveKeys", generateEllipticCurveKeys)
         
-        AsyncFunction("getEllipticCurvePublicKey") { (alias: String, promise: Promise) in
-            let key = getEllipticCurvePublicKey(alias: alias)
-            promise.resolve(key)
-        }
+        AsyncFunction("getEllipticCurvePublicKey", getEllipticCurvePublicKey)
         
-        AsyncFunction("isKeyPresentInKeychain") { (alias: String, promise: Promise) in
-            let isPresent = isKeyPresentInKeychain(alias: alias)
-            promise.resolve(isPresent)
-        }
+        AsyncFunction("isKeyPresentInKeychain", isKeyPresentInKeychain)
         
-        AsyncFunction("deleteKey") { (alias: String, promise: Promise) in
-            let deleted = deleteKey(alias: alias)
-            promise.resolve(deleted)
-        }
+        AsyncFunction("deleteKey", deleteKey)
         
-        AsyncFunction("sign") { (data: Data, info: SignatureInfo, promise: Promise) in
-            sign(data: data, info: info, promise: promise)
-        }
+        AsyncFunction("sign", sign)
         
-        AsyncFunction("verify") { (data: Data, signature: Data, alias: String, promise: Promise) in
-            verify(data: data, signature: signature, alias: alias, promise: promise)
-        }
+        AsyncFunction("verify", verify)
         
-        AsyncFunction("verifyWithKey") { (data: Data, signature: Data, publicKey: PublicKey, promise: Promise) in
-            verifyWithKey(data: data, signature: signature, publicKey: publicKey, promise: promise)
-        }
+        AsyncFunction("verifyWithKey", verifyWithKey)
     }
     
-    private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
+    private func generateEllipticCurveKeys(alias: String, promise: Promise) {
         let tag = alias.data(using: .utf8)!
         var error: Unmanaged<CFError>?
         
@@ -56,7 +34,8 @@ public class SignatureModule: Module {
             [.privateKeyUsage, .biometryAny],
             &error
         ) else {
-            throw error!.takeRetainedValue() as Error
+            promise.reject(.from(code: .invalidParameters, error: error!.takeRetainedValue()))
+            return
         }
         
         let attributes: NSMutableDictionary = [
@@ -73,46 +52,75 @@ public class SignatureModule: Module {
 #endif
         
         guard let privateKey = SecKeyCreateRandomKey(attributes, &error) else {
-            throw error!.takeRetainedValue() as Error
+            promise.reject(.from(code: .keyStoreError, error: error!.takeRetainedValue()))
+            return
         }
         
         guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw SignatureError.noPublicKey
+            promise.reject(.from(code: .generalError, description: "Can't retrieve the public key"))
+            return
         }
         
         guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as? Data else {
-            throw error!.takeRetainedValue() as Error
+            promise.reject(.from(code: .keyExportError, error: error!.takeRetainedValue()))
+            return
         }
         
-        return try PublicKey(data: publicKeyData)
+        do {
+            let key = try PublicKey(data: publicKeyData)
+            promise.resolve(key)
+        } catch PublicKeyError.keyDataTooShort {
+            promise.reject(.from(code: .invalidKey, description: "Data too short"))
+        } catch PublicKeyError.invalidPublicKeyPrefix {
+            promise.reject(.from(code: .invalidKey, description: "Invalid public key prefix"))
+        } catch {
+            promise.reject(.from(code: .invalidKey, description: "Unknow error in public key data"))
+        }
     }
     
-    private func getEllipticCurvePublicKey(alias: String) -> PublicKey? {
+    private func getEllipticCurvePublicKey(alias: String, promise: Promise) {
         let (status, item) = queryForKey(alias: alias)
         
+        guard status != errSecItemNotFound else {
+            promise.resolve(nil)
+            return
+        }
+        
         guard status == errSecSuccess else {
-            return nil
+            promise.reject(.from(code: .keyStoreError, description: "Error retrieving key"))
+            return
         }
         
         let privateKey = item as! SecKey
         guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            return nil
+            promise.reject(.from(code: .keyStoreError, description: "Can't recontruct the key"))
+            return
         }
         
         guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as? Data else {
-            return nil
+            promise.reject(.from(code: .keyExportError, description: "Can't export the key"))
+            return
         }
         
-        return try? PublicKey(data: publicKeyData)
+        do {
+            let key = try PublicKey(data: publicKeyData)
+            promise.resolve(key)
+        } catch PublicKeyError.keyDataTooShort {
+            promise.reject(.from(code: .invalidKey, description: "Data too short"))
+        } catch PublicKeyError.invalidPublicKeyPrefix {
+            promise.reject(.from(code: .invalidKey, description: "Invalid public key prefix"))
+        } catch {
+            promise.reject(.from(code: .invalidKey, description: "Unknow error in public key data"))
+        }
     }
     
-    private func isKeyPresentInKeychain(alias: String) -> Bool {
+    private func isKeyPresentInKeychain(alias: String, promise: Promise) {
         let (status, _) = queryForKey(alias: alias)
         
-        return status == errSecSuccess
+        promise.resolve(status == errSecSuccess)
     }
     
-    private func deleteKey(alias: String) -> Bool {
+    private func deleteKey(alias: String, promise: Promise) {
         let tag = alias.data(using: .utf8)!
         
         let query: NSDictionary = [
@@ -122,7 +130,7 @@ public class SignatureModule: Module {
         
         let status = SecItemDelete(query)
         
-        return status == errSecSuccess
+        promise.resolve(status == errSecSuccess)
     }
     
     private func queryForKey(alias: String, context: LAContext? = nil) -> (OSStatus, CFTypeRef?) {
@@ -155,7 +163,7 @@ public class SignatureModule: Module {
         let (status, item) = self.queryForKey(alias: info.alias)
         
         guard status == errSecSuccess else {
-            promise.reject(SignatureError.noKeyForThisAlias)
+            promise.reject(.from(code: .keyStoreError, description: "Error retrieving key"))
             return
         }
         
@@ -163,13 +171,13 @@ public class SignatureModule: Module {
         let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
         guard SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm) else {
-            promise.reject(SignatureError.unsupportedAlghoritm)
+            promise.reject(.from(code: .noSuchAlgorithm, description: "Algorithm not available for this key"))
             return
         }
         
         var error: Unmanaged<CFError>?
         guard let signature = SecKeyCreateSignature(privateKey, algorithm, data as CFData, &error) as Data? else {
-            promise.reject(error!.takeRetainedValue() as Error)
+            promise.reject(.from(code: .signatureError, error: error!.takeRetainedValue()))
             return
         }
         
@@ -181,20 +189,20 @@ public class SignatureModule: Module {
         let (status, item) = queryForKey(alias: alias)
         
         guard status == errSecSuccess else {
-            promise.reject(SignatureError.noKeyForThisAlias)
+            promise.reject(.from(code: .keyStoreError, description: "Error retrieving key"))
             return
         }
         
         let privateKey = item as! SecKey
         guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            promise.reject(SignatureError.noPublicKey)
+            promise.reject(.from(code: .keyStoreError, description: "Can't recontruct the key"))
             return
         }
         
         let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
         guard SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
-            promise.reject(SignatureError.unsupportedAlghoritm)
+            promise.reject(.from(code: .noSuchAlgorithm, description: "Algorithm not available for this key"))
             return
         }
         
@@ -202,7 +210,7 @@ public class SignatureModule: Module {
         let verified = SecKeyVerifySignature(publicKey, algorithm, data as CFData, signature as CFData, &error)
         
         if let error = error?.takeRetainedValue() as? Error {
-            promise.reject(error)
+            promise.reject(.from(code: .signatureError, error: error))
             return
         }
         
@@ -211,7 +219,7 @@ public class SignatureModule: Module {
     
     private func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey, promise: Promise) {
         guard let keyData = publicKey.coordinatesAsData() else {
-            promise.reject(SignatureError.invalidPublicKeyFormat)
+            promise.reject(.from(code: .invalidKey, description: "Invalid public key data"))
             return
         }
         
@@ -227,33 +235,25 @@ public class SignatureModule: Module {
             parameters as CFDictionary,
             &error
         ) else {
-            promise.reject(error!.takeRetainedValue())
+            promise.reject(.from(code: .invalidKey, description: "Cannot create key with this data"))
             return
         }
         
         let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
         guard SecKeyIsAlgorithmSupported(key, .verify, algorithm) else {
-            promise.reject(SignatureError.unsupportedAlghoritm)
+            promise.reject(.from(code: .noSuchAlgorithm, description: "Algorithm not available for this key"))
             return
         }
         
         let verified = SecKeyVerifySignature(key, algorithm, data as CFData, signature as CFData, &error)
         
         if let error = error?.takeRetainedValue() as? Error {
-            promise.reject(error)
+            promise.reject(.from(code: .signatureError, error: error))
             return
         }
         
         promise.resolve(verified)
     }
     
-}
-
-enum SignatureError: Error {
-    case noPublicKey
-    case noKeyForThisAlias
-    case unsupportedAlghoritm
-    case invalidPublicKeyFormat
-    case keyNotAdded
 }
