@@ -24,7 +24,7 @@ public class SignatureModule: Module {
         AsyncFunction("verifyWithKey", verifyWithKey)
     }
     
-    private func generateEllipticCurveKeys(alias: String, promise: Promise) {
+    private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
         let tag = alias.data(using: .utf8)!
         var error: Unmanaged<CFError>?
         
@@ -34,8 +34,7 @@ public class SignatureModule: Module {
             [.privateKeyUsage, .biometryAny],
             &error
         ) else {
-            promise.reject(.from(code: .invalidParameters, error: error!.takeRetainedValue()))
-            return
+            throw error!.takeRetainedValue()
         }
         
         let attributes: NSMutableDictionary = [
@@ -52,75 +51,44 @@ public class SignatureModule: Module {
 #endif
         
         guard let privateKey = SecKeyCreateRandomKey(attributes, &error) else {
-            promise.reject(.from(code: .keyStoreError, error: error!.takeRetainedValue()))
-            return
+            throw error!.takeRetainedValue()
         }
         
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            promise.reject(.from(code: .generalError, description: "Can't retrieve the public key"))
-            return
-        }
+        let publicKey = SecKeyCopyPublicKey(privateKey)!
         
         guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as? Data else {
-            promise.reject(.from(code: .keyExportError, error: error!.takeRetainedValue()))
-            return
+            throw error!.takeRetainedValue()
         }
         
-        do {
-            let key = try PublicKey(data: publicKeyData)
-            promise.resolve(key)
-        } catch PublicKeyError.keyDataTooShort {
-            promise.reject(.from(code: .invalidKey, description: "Data too short"))
-        } catch PublicKeyError.invalidPublicKeyPrefix {
-            promise.reject(.from(code: .invalidKey, description: "Invalid public key prefix"))
-        } catch {
-            promise.reject(.from(code: .invalidKey, description: "Unknow error in public key data"))
-        }
+        return try PublicKey(data: publicKeyData)
     }
     
-    private func getEllipticCurvePublicKey(alias: String, promise: Promise) {
+    private func getEllipticCurvePublicKey(alias: String) throws -> PublicKey? {
         let (status, item) = queryForKey(alias: alias)
         
         guard status != errSecItemNotFound else {
-            promise.resolve(nil)
-            return
+            return nil
         }
         
         guard status == errSecSuccess else {
-            promise.reject(.from(code: .keyStoreError, description: "Error retrieving key"))
-            return
+            throw RetrieveKeyException(status)
         }
         
         let privateKey = item as! SecKey
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            promise.reject(.from(code: .keyStoreError, description: "Can't recontruct the key"))
-            return
-        }
+        let publicKey = SecKeyCopyPublicKey(privateKey)!
         
-        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as? Data else {
-            promise.reject(.from(code: .keyExportError, description: "Can't export the key"))
-            return
-        }
+        let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil)! as Data
         
-        do {
-            let key = try PublicKey(data: publicKeyData)
-            promise.resolve(key)
-        } catch PublicKeyError.keyDataTooShort {
-            promise.reject(.from(code: .invalidKey, description: "Data too short"))
-        } catch PublicKeyError.invalidPublicKeyPrefix {
-            promise.reject(.from(code: .invalidKey, description: "Invalid public key prefix"))
-        } catch {
-            promise.reject(.from(code: .invalidKey, description: "Unknow error in public key data"))
-        }
+        return try PublicKey(data: publicKeyData)
     }
     
-    private func isKeyPresentInKeychain(alias: String, promise: Promise) {
+    private func isKeyPresentInKeychain(alias: String) -> Bool {
         let (status, _) = queryForKey(alias: alias)
         
-        promise.resolve(status == errSecSuccess)
+        return status == errSecSuccess
     }
     
-    private func deleteKey(alias: String, promise: Promise) {
+    private func deleteKey(alias: String) -> Bool {
         let tag = alias.data(using: .utf8)!
         
         let query: NSDictionary = [
@@ -130,7 +98,93 @@ public class SignatureModule: Module {
         
         let status = SecItemDelete(query)
         
-        promise.resolve(status == errSecSuccess)
+        return status == errSecSuccess
+    }
+    
+    private func sign(data: Data, info: SignatureInfo) throws -> Data {
+        let context = LAContext()
+        let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
+        context.localizedReason = reason
+        context.localizedCancelTitle = info.cancel
+        
+        let (status, item) = self.queryForKey(alias: info.alias)
+        
+        guard status == errSecSuccess else {
+            throw RetrieveKeyException(status)
+        }
+        
+        let privateKey = item as! SecKey
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
+        
+        guard SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm) else {
+            throw UnsupportedAlgorithm()
+        }
+        
+        var error: Unmanaged<CFError>?
+        guard let signature = SecKeyCreateSignature(privateKey, algorithm, data as CFData, &error) as Data? else {
+            throw error!.takeRetainedValue()
+        }
+        
+        return signature
+    }
+    
+    private func verify(data: Data, signature: Data, alias: String) throws -> Bool {
+        let (status, item) = queryForKey(alias: alias)
+        
+        guard status == errSecSuccess else {
+            throw RetrieveKeyException(status)
+        }
+        
+        let privateKey = item as! SecKey
+        let publicKey = SecKeyCopyPublicKey(privateKey)!
+        
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
+        
+        guard SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
+            throw UnsupportedAlgorithm()
+        }
+        
+        var error: Unmanaged<CFError>?
+        let verified = SecKeyVerifySignature(publicKey, algorithm, data as CFData, signature as CFData, &error)
+        
+        if let error = error?.takeRetainedValue() as? Error {
+            throw error
+        }
+        
+        return verified
+    }
+    
+    private func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey) throws -> Bool {
+        let keyData = try publicKey.coordinatesAsData()
+        
+        let parameters: NSDictionary = [
+            kSecAttrKeyType: kSecAttrKeyTypeEC,
+            kSecAttrKeyClass: kSecAttrKeyClassPublic,
+            kSecAttrKeySizeInBits: kKeySize,
+        ]
+        
+        var error: Unmanaged<CFError>?
+        guard let key = SecKeyCreateWithData(
+            keyData as CFData,
+            parameters as CFDictionary,
+            &error
+        ) else {
+            throw error!.takeRetainedValue()
+        }
+        
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
+        
+        guard SecKeyIsAlgorithmSupported(key, .verify, algorithm) else {
+            throw UnsupportedAlgorithm()
+        }
+        
+        let verified = SecKeyVerifySignature(key, algorithm, data as CFData, signature as CFData, &error)
+        
+        if let error = error?.takeRetainedValue() as? Error {
+            throw error
+        }
+        
+        return verified
     }
     
     private func queryForKey(alias: String, context: LAContext? = nil) -> (OSStatus, CFTypeRef?) {
@@ -154,106 +208,18 @@ public class SignatureModule: Module {
         return (status, item)
     }
     
-    private func sign(data: Data, info: SignatureInfo, promise: Promise) {
-        let context = LAContext()
-        let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
-        context.localizedReason = reason
-        context.localizedCancelTitle = info.cancel
-        
-        let (status, item) = self.queryForKey(alias: info.alias)
-        
-        guard status == errSecSuccess else {
-            promise.reject(.from(code: .keyStoreError, description: "Error retrieving key"))
-            return
-        }
-        
-        let privateKey = item as! SecKey
-        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
-        
-        guard SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm) else {
-            promise.reject(.from(code: .noSuchAlgorithm, description: "Algorithm not available for this key"))
-            return
-        }
-        
-        var error: Unmanaged<CFError>?
-        guard let signature = SecKeyCreateSignature(privateKey, algorithm, data as CFData, &error) as Data? else {
-            promise.reject(.from(code: .signatureError, error: error!.takeRetainedValue()))
-            return
-        }
-        
-        promise.resolve(signature)
-        
-    }
-    
-    private func verify(data: Data, signature: Data, alias: String, promise: Promise) {
-        let (status, item) = queryForKey(alias: alias)
-        
-        guard status == errSecSuccess else {
-            promise.reject(.from(code: .keyStoreError, description: "Error retrieving key"))
-            return
-        }
-        
-        let privateKey = item as! SecKey
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            promise.reject(.from(code: .keyStoreError, description: "Can't recontruct the key"))
-            return
-        }
-        
-        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
-        
-        guard SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
-            promise.reject(.from(code: .noSuchAlgorithm, description: "Algorithm not available for this key"))
-            return
-        }
-        
-        var error: Unmanaged<CFError>?
-        let verified = SecKeyVerifySignature(publicKey, algorithm, data as CFData, signature as CFData, &error)
-        
-        if let error = error?.takeRetainedValue() as? Error {
-            promise.reject(.from(code: .signatureError, error: error))
-            return
-        }
-        
-        promise.resolve(verified)
-    }
-    
-    private func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey, promise: Promise) {
-        guard let keyData = publicKey.coordinatesAsData() else {
-            promise.reject(.from(code: .invalidKey, description: "Invalid public key data"))
-            return
-        }
-        
-        let parameters: NSDictionary = [
-            kSecAttrKeyType: kSecAttrKeyTypeEC,
-            kSecAttrKeyClass: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits: kKeySize,
-        ]
-        
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateWithData(
-            keyData as CFData,
-            parameters as CFDictionary,
-            &error
-        ) else {
-            promise.reject(.from(code: .invalidKey, description: "Cannot create key with this data"))
-            return
-        }
-        
-        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
-        
-        guard SecKeyIsAlgorithmSupported(key, .verify, algorithm) else {
-            promise.reject(.from(code: .noSuchAlgorithm, description: "Algorithm not available for this key"))
-            return
-        }
-        
-        let verified = SecKeyVerifySignature(key, algorithm, data as CFData, signature as CFData, &error)
-        
-        if let error = error?.takeRetainedValue() as? Error {
-            promise.reject(.from(code: .signatureError, error: error))
-            return
-        }
-        
-        promise.resolve(verified)
-    }
-    
 }
+
+private class RetrieveKeyException: GenericException<OSStatus> {
+    override var reason: String {
+        "Key retrieval has failed with OSStatus code: \(param)"
+    }
+}
+
+private class UnsupportedAlgorithm: Exception {
+    override var reason: String {
+        "Algorithm not available for this key"
+    }
+}
+
+
