@@ -7,9 +7,8 @@
 
 import ExpoModulesCore
 
-struct SignatureInfo: Record {
+struct SignaturePrompt: Record {
     @Field var title: String?
     @Field var subtitle: String?
     @Field var cancel: String?
-    @Field var alias: String
 }

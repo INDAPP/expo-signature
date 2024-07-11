@@ -1,5 +1,5 @@
 import SignatureModule from "./SignatureModule";
-import { PublicKey, SignatureInfo } from "./SignatureModule.types";
+import { PublicKey, SignaturePrompt } from "./SignatureModule.types";
 
 export async function generateEllipticCurveKeys(
   alias: string,
@@ -23,9 +23,10 @@ export async function deleteKey(alias: string): Promise<boolean> {
 
 export async function signData(
   data: Uint8Array,
-  info: SignatureInfo,
+  alias: string,
+  info: SignaturePrompt,
 ): Promise<Uint8Array> {
-  return await SignatureModule.sign(data, info);
+  return await SignatureModule.sign(data, alias, info);
 }
 
 export async function verifyData(

@@ -101,13 +101,13 @@ public class SignatureModule: Module {
         return status == errSecSuccess
     }
     
-    private func sign(data: Data, info: SignatureInfo) throws -> Data {
+    private func sign(data: Data, alias: String, info: SignaturePrompt) throws -> Data {
         let context = LAContext()
         let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
         context.localizedReason = reason
         context.localizedCancelTitle = info.cancel
         
-        let (status, item) = self.queryForKey(alias: info.alias)
+        let (status, item) = self.queryForKey(alias: alias)
         
         guard status == errSecSuccess else {
             throw RetrieveKeyException(status)

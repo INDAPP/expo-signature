@@ -3,9 +3,8 @@ export type PublicKey = {
   y: string;
 };
 
-export type SignatureInfo = {
+export type SignaturePrompt = {
   title?: string;
   subtitle?: string;
   cancel?: string;
-  alias: string;
 };

@@ -5,11 +5,10 @@ import androidx.biometric.BiometricPrompt
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 
-class SignatureInfo(
+class SignaturePrompt(
     @Field val title: String?,
     @Field val subtitle: String?,
     @Field val cancel: String?,
-    @Field val alias: String,
 ): Record {
     fun getPromptInfo(): BiometricPrompt.PromptInfo = BiometricPrompt.PromptInfo.Builder().run {
         title?.let { setTitle(it) }

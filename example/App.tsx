@@ -42,8 +42,7 @@ export default function App() {
   }, []);
 
   const sign = useCallback(async () => {
-    const signedData = await signData(data, {
-      alias: keyTag,
+    const signedData = await signData(data, keyTag, {
       title: "Sign",
       subtitle: "Authenticate to sign data",
       cancel: "Cancel",

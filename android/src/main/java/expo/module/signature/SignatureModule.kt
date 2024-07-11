@@ -116,8 +116,8 @@ class SignatureModule : Module() {
         return true
     }
 
-    private suspend fun sign(data: ByteArray, info: SignatureInfo): ByteArray {
-        val key = keyStore.getKey(info.alias, null) as PrivateKey
+    private suspend fun sign(data: ByteArray, alias: String, info: SignaturePrompt): ByteArray {
+        val key = keyStore.getKey(alias, null) as PrivateKey
         val cryptoObject = Signature.getInstance(SIGNATURE_ALGORITHM).run {
             initSign(key)
             BiometricPrompt.CryptoObject(this)
