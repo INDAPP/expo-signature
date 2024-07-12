@@ -43,7 +43,7 @@
       <true/>
     </dict>
     <key>NSFaceIDUsageDescription</key>
-    <string>Unlock key for digital signature</string>
+    <string>Allow $(PRODUCT_NAME) to use Face ID.</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>
