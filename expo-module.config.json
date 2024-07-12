@@ -1,5 +1,6 @@
 {
-  "platforms": ["ios", "tvos", "android", "web"],
+  "name": "expo-signature",
+  "platforms": ["ios", "android"],
   "ios": {
     "modules": ["SignatureModule"]
   },
