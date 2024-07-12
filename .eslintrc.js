@@ -1,1 +1,9 @@
-module.exports = require("expo-module-scripts/eslintrc.base.js");
+module.exports = {
+  root: true,
+  extends: ['universe/native', 'prettier'],
+  plugins: ['@typescript-eslint', 'prettier'],
+  ignorePatterns: ['build'],
+  rules: {
+    'prettier/prettier': 'error',
+  }
+};

@@ -28,11 +28,12 @@
   "author": "Riccardo Pizzoni <indapp.info@gmail.com> (https://github.com/INDAPP)",
   "license": "MIT",
   "homepage": "https://github.com/INDAPP/expo-signature#readme",
-  "dependencies": {},
   "devDependencies": {
     "@types/react": "^18.0.25",
+    "eslint-config-prettier": "^9.1.0",
     "expo-module-scripts": "^3.5.2",
-    "expo-modules-core": "^1.12.17"
+    "expo-modules-core": "^1.12.17",
+    "prettier": "^3.3.2"
   },
   "peerDependencies": {
     "expo": "*",

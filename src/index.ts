@@ -1,15 +1,11 @@
-import SignatureModule from "./SignatureModule";
-import { PublicKey, SignaturePrompt } from "./SignatureModule.types";
+import SignatureModule from './SignatureModule';
+import { PublicKey, SignaturePrompt } from './SignatureModule.types';
 
-export async function generateEllipticCurveKeys(
-  alias: string,
-): Promise<PublicKey> {
+export async function generateEllipticCurveKeys(alias: string): Promise<PublicKey> {
   return await SignatureModule.generateEllipticCurveKeys(alias);
 }
 
-export async function getEllipticCurvePublicKey(
-  alias: string,
-): Promise<PublicKey | null> {
+export async function getEllipticCurvePublicKey(alias: string): Promise<PublicKey | null> {
   return await SignatureModule.getEllipticCurvePublicKey(alias);
 }
 
@@ -24,7 +20,7 @@ export async function deleteKey(alias: string): Promise<boolean> {
 export async function signData(
   data: Uint8Array,
   alias: string,
-  info: SignaturePrompt,
+  info: SignaturePrompt
 ): Promise<Uint8Array> {
   return await SignatureModule.sign(data, alias, info);
 }
@@ -32,7 +28,7 @@ export async function signData(
 export async function verifyData(
   data: Uint8Array,
   signature: Uint8Array,
-  alias: string,
+  alias: string
 ): Promise<boolean> {
   return await SignatureModule.verify(data, signature, alias);
 }
@@ -40,7 +36,7 @@ export async function verifyData(
 export async function verifyWithKey(
   data: Uint8Array,
   signature: Uint8Array,
-  key: PublicKey,
+  key: PublicKey
 ): Promise<boolean> {
   return await SignatureModule.verifyWithKey(data, signature, key);
 }
