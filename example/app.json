@@ -13,10 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "expo.module.signature.example",
-      "infoPlist": {
-        "NSFaceIDUsageDescription": "Unlock key for digital signature"
-      }
+      "bundleIdentifier": "expo.module.signature.example"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,8 +22,13 @@
       },
       "package": "expo.module.signature.example"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      [
+        "../app.plugin.js",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
+        }
+      ]
+    ]
   }
 }
