@@ -7,12 +7,12 @@
 ### Usage
 
 ```ts
-import * as Signature from "expo-signature";
+import * as Signature from 'expo-signature';
 
-const keyAlias = "my_key_alias";
+const keyAlias = 'my_key_alias';
 
 const encoder = new TextEncoder();
-const data = encoder.encode("Data to sign");
+const data = encoder.encode('Data to sign');
 ```
 
 #### Generate Key Pair
@@ -24,8 +24,7 @@ const publicKey: PublicKey = await Signature.generateEllipticCurveKeys(alias);
 #### Retrieve an existing Public Key
 
 ```ts
-const publicKey: PublicKey | null =
-  await Signature.getEllipticCurvePublicKey(alias);
+const publicKey: PublicKey | null = await Signature.getEllipticCurvePublicKey(alias);
 ```
 
 #### Check for key presence
@@ -44,9 +43,9 @@ const deleted: boolean = await Signature.deleteKey(alias);
 
 ```ts
 const info: SignaturePrompt = {
-  title: "User authentication",
-  subtitle: "Use biometry authentication to sign data",
-  cancel: "Cancel authentication",
+  title: 'User authentication',
+  subtitle: 'Use biometry authentication to sign data',
+  cancel: 'Cancel authentication',
 };
 
 const signature: Uint8Array = await Signature.signData(data, alias, info);
@@ -62,15 +61,11 @@ const isValid: boolean = await Signature.verifyData(data, signature, alias);
 
 ```ts
 const publicKey: PublicKey = {
-  x: "1234567890...",
-  y: "0987654321...",
+  x: '1234567890...',
+  y: '0987654321...',
 };
 
-const isValid: boolean = await Signature.verifyWithKey(
-  data,
-  signature,
-  publicKey
-);
+const isValid: boolean = await Signature.verifyWithKey(data, signature, publicKey);
 ```
 
 ### Example
@@ -105,6 +100,37 @@ Run `npx pod-install` after installing the npm package.
 ### Configure for Android
 
 No additional set up necessary.
+
+This module requires permissions to access the biometric data for authentication purposes. The `USE_BIOMETRIC` and `USE_FINGERPRINT` permissions are automatically added.
+
+```xml
+<!-- Added permissions -->
+<uses-permission android:name="android.permission.USE_BIOMETRIC" />
+<uses-permission android:name="android.permission.USE_FINGERPRINT" />
+```
+
+### Config Plugin
+
+> This plugin is applied automatically in EAS Build, only add the config plugin if you want to pass in extra properties.
+
+After installing this npm package, add the [config plugin](https://docs.expo.dev/config-plugins/introduction) to the [`plugins`](https://docs.expo.io/versions/latest/config/app/#plugins) array of your `app.json` or `app.config.js`:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "expo-signature",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
+        }
+      ]
+    ]
+  }
+}
+```
+
+> Running `npx expo prebuild` will generate the [native project locally](https://docs.expo.dev/workflow/customizing/) with the applied changes in your iOS `Info.plist` file.
 
 # Contributing
 
