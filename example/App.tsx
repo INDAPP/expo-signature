@@ -1,34 +1,38 @@
-import * as Clipboard from "expo-clipboard";
+import * as Clipboard from 'expo-clipboard';
 import {
-  generateEllipticCurveKeys,
-  getEllipticCurvePublicKey,
   isKeyPresentInKeychain,
   deleteKey,
   signData,
   verifyData,
   verifyWithKey,
-} from "expo-signature";
-import { PublicKey } from "expo-signature/SignatureModule.types";
-import { useCallback, useMemo, useState } from "react";
-import { Button, StyleSheet, Text, View } from "react-native";
+  generateKeys,
+  getPublicKey,
+} from 'expo-signature';
+import { ECPublicKey, RSAPublicKey } from 'expo-signature/SignatureModule.types';
+import { useCallback, useMemo, useState } from 'react';
+import { Button, StyleSheet, Text, View } from 'react-native';
 
-const keyTag = "test_ecc_key";
+const keyTag = 'test_ecc_key';
 
-const data = stringToUint8Array("Hello World!");
+const data = stringToUint8Array('Hello World!');
 
 export default function App() {
-  const [publicKey, setPublicKey] = useState<PublicKey | null>();
+  const [publicKey, setPublicKey] = useState<ECPublicKey | RSAPublicKey | null>();
   const [isKeyPresent, setIsKeyPresent] = useState<boolean>();
   const [signedData, setSignedData] = useState<Uint8Array>();
   const [verified, setVerified] = useState<boolean>();
 
   const generateKeyPair = useCallback(async () => {
-    const publicKey = await generateEllipticCurveKeys(keyTag);
+    const publicKey = await generateKeys({
+      alias: keyTag,
+      algorithm: 'RSA',
+      size: 2048,
+    });
     setPublicKey(publicKey);
   }, []);
 
   const retrieveKey = useCallback(async () => {
-    const publicKey = await getEllipticCurvePublicKey(keyTag);
+    const publicKey = await getPublicKey(keyTag);
     setPublicKey(publicKey);
   }, []);
 
@@ -43,9 +47,9 @@ export default function App() {
 
   const sign = useCallback(async () => {
     const signedData = await signData(data, keyTag, {
-      title: "Sign",
-      subtitle: "Authenticate to sign data",
-      cancel: "Cancel",
+      title: 'Sign',
+      subtitle: 'Authenticate to sign data',
+      cancel: 'Cancel',
     });
     setSignedData(signedData);
   }, []);
@@ -107,7 +111,7 @@ export default function App() {
       <Button title="Sign data" onPress={sign} />
       <Button title="Verify data" onPress={verify} />
       <Button title="Verify with key" onPress={verifyWithoutKeychain} />
-      <Text>{verified ? "Data verified succesfully" : "Not yet verified"}</Text>
+      <Text>{verified ? 'Data verified succesfully' : 'Not yet verified'}</Text>
     </View>
   );
 }
@@ -115,9 +119,9 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     padding: 16,
   },
@@ -135,8 +139,8 @@ function stringToUint8Array(str: string): Uint8Array {
 
 function uInt8ArrayToHexString(data: Uint8Array): string {
   return Array.from(data)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join(":");
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join(':');
 }
 
 // function hexStringToUint8Array(str: string): Uint8Array {
