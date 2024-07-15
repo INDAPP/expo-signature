@@ -9,9 +9,9 @@ public class SignatureModule: Module {
     public func definition() -> ModuleDefinition {
         Name("ExpoSignature")
         
-        AsyncFunction("generateEllipticCurveKeys", generateEllipticCurveKeys)
+        AsyncFunction("generateKeys", generateKeys)
         
-        AsyncFunction("getEllipticCurvePublicKey", getEllipticCurvePublicKey)
+        AsyncFunction("getPublicKey", getPublicKey)
         
         AsyncFunction("isKeyPresentInKeychain", isKeyPresentInKeychain)
         
@@ -24,8 +24,7 @@ public class SignatureModule: Module {
         AsyncFunction("verifyWithKey", verifyWithKey)
     }
     
-    private func generateEllipticCurveKeys(alias: String) throws -> PublicKey {
-        let tag = alias.data(using: .utf8)!
+    private func generateKeys(keySpec: KeySpec) throws -> PublicKey {
         var error: Unmanaged<CFError>?
         
         guard let access = SecAccessControlCreateWithFlags(
@@ -38,11 +37,11 @@ public class SignatureModule: Module {
         }
         
         let attributes: NSMutableDictionary = [
-            kSecAttrKeyType: kSecAttrKeyTypeEC,
-            kSecAttrKeySizeInBits: kKeySize,
+            kSecAttrKeyType: keySpec.algorithm.type,
+            kSecAttrKeySizeInBits: keySpec.size,
             kSecPrivateKeyAttrs: [
                 kSecAttrIsPermanent: true,
-                kSecAttrApplicationTag: tag,
+                kSecAttrApplicationTag: keySpec.tag,
                 kSecAttrAccessControl: access
             ]
         ]
@@ -60,10 +59,15 @@ public class SignatureModule: Module {
             throw error!.takeRetainedValue()
         }
         
-        return try PublicKey(data: publicKeyData)
+        switch keySpec.algorithm {
+        case .EC:
+            return try ECPublicKey(data: publicKeyData)
+        case .RSA:
+            return try RSAPublicKey(data: publicKeyData)
+        }
     }
     
-    private func getEllipticCurvePublicKey(alias: String) throws -> PublicKey? {
+    private func getPublicKey(alias: String) throws -> PublicKey? {
         let (status, item) = queryForKey(alias: alias)
         
         guard status != errSecItemNotFound else {
@@ -79,7 +83,23 @@ public class SignatureModule: Module {
         
         let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil)! as Data
         
-        return try PublicKey(data: publicKeyData)
+        guard let attributes = SecKeyCopyAttributes(publicKey) else {
+            return nil
+        }
+        
+        guard let keyType = (attributes as NSDictionary)[kSecAttrKeyType] as? String else {
+            return nil
+        }
+        
+        switch keyType as CFString {
+        case kSecAttrKeyTypeEC:
+            return try ECPublicKey(data: publicKeyData)
+        case kSecAttrKeyTypeRSA:
+            return try RSAPublicKey(data: publicKeyData)
+        default:
+            return nil
+        }
+        
     }
     
     private func isKeyPresentInKeychain(alias: String) -> Bool {
@@ -114,9 +134,9 @@ public class SignatureModule: Module {
         }
         
         let privateKey = item as! SecKey
-        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
-        guard SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm) else {
+        guard let algorithm: SecKeyAlgorithm = getKeyAlgorithm(key: privateKey),
+              SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm) else {
             throw UnsupportedAlgorithm()
         }
         
@@ -138,9 +158,10 @@ public class SignatureModule: Module {
         let privateKey = item as! SecKey
         let publicKey = SecKeyCopyPublicKey(privateKey)!
         
-        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
-        guard SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
+        
+        guard let algorithm: SecKeyAlgorithm = getKeyAlgorithm(key: privateKey),
+              SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
             throw UnsupportedAlgorithm()
         }
         
@@ -154,13 +175,22 @@ public class SignatureModule: Module {
         return verified
     }
     
-    private func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey) throws -> Bool {
-        let keyData = try publicKey.coordinatesAsData()
+    private func verifyWithKey(data: Data, signature: Data, publicKey: Either<ECPublicKey, RSAPublicKey>) throws -> Bool {
+        var keyData: Data!
+        var type: CFString!
+        if let ecPublicKey: ECPublicKey = publicKey.get() {
+            keyData = try ecPublicKey.asData()
+            type = kSecAttrKeyTypeEC
+        }
+        if let rsaPublicKey: RSAPublicKey = publicKey.get() {
+            keyData = try rsaPublicKey.asData()
+            type = kSecAttrKeyTypeRSA
+        }
         
         let parameters: NSDictionary = [
-            kSecAttrKeyType: kSecAttrKeyTypeEC,
+            kSecAttrKeyType: type!,
             kSecAttrKeyClass: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits: kKeySize,
+//            kSecAttrKeySizeInBits: kKeySize,
         ]
         
         var error: Unmanaged<CFError>?
@@ -172,9 +202,10 @@ public class SignatureModule: Module {
             throw error!.takeRetainedValue()
         }
         
-        let algorithm: SecKeyAlgorithm = .ecdsaSignatureMessageX962SHA256
         
-        guard SecKeyIsAlgorithmSupported(key, .verify, algorithm) else {
+        
+        guard let algorithm: SecKeyAlgorithm = getKeyAlgorithm(key: key),
+              SecKeyIsAlgorithmSupported(key, .verify, algorithm) else {
             throw UnsupportedAlgorithm()
         }
         
@@ -195,7 +226,7 @@ public class SignatureModule: Module {
             kSecAttrApplicationTag: tag,
             kSecReturnRef: kCFBooleanTrue!,
             kSecMatchLimit: kSecMatchLimitOne,
-            kSecAttrKeyType: kSecAttrKeyTypeEC,
+//            kSecAttrKeyType: kSecAttrKeyTypeEC,
         ]
         if let context = context {
             query[kSecUseAuthenticationContext] = context
@@ -206,6 +237,25 @@ public class SignatureModule: Module {
         let status = SecItemCopyMatching(query, &item)
         
         return (status, item)
+    }
+    
+    private func getKeyAlgorithm(key: SecKey) -> SecKeyAlgorithm? {
+        guard let attributes = SecKeyCopyAttributes(key) else {
+            return nil
+        }
+        
+        guard let keyType = (attributes as NSDictionary)[kSecAttrKeyType] as? String else {
+            return nil
+        }
+        
+        switch keyType as CFString {
+        case kSecAttrKeyTypeEC:
+            return .ecdsaSignatureMessageX962SHA256
+        case kSecAttrKeyTypeRSA:
+            return .rsaSignatureMessagePKCS1v15SHA256
+        default:
+            return nil
+        }
     }
     
 }
