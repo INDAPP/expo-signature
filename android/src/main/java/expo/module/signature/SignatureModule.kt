@@ -6,34 +6,40 @@ import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import expo.module.signature.models.SignatureAlgorithm
+import expo.module.signature.models.KeySpec
+import expo.module.signature.models.ECPublicKey
+import expo.module.signature.models.PublicKey
+import expo.module.signature.models.RSAPublicKey
+import expo.module.signature.models.SignaturePrompt
 import expo.modules.core.interfaces.ActivityProvider
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.types.Either
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.math.BigInteger
 import java.security.AlgorithmParameters
+import java.security.Key
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
-import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
+import java.security.spec.RSAPublicKeySpec
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 
 const val ANDROID_KEYSTORE = "AndroidKeyStore"
-const val KEY_SIZE = 256
 const val CURVE_SPEC = "secp256r1"
-const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
 
 class SignatureModule : Module() {
     private lateinit var mActivityProvider: ActivityProvider
@@ -49,9 +55,9 @@ class SignatureModule : Module() {
             )
         }
 
-        AsyncFunction("generateEllipticCurveKeys", this@SignatureModule::generateEllipticCurveKeys)
+        AsyncFunction("generateKeys", this@SignatureModule::generateKeys)
 
-        AsyncFunction("getEllipticCurvePublicKey", this@SignatureModule::getEllipticCurvePublicKey)
+        AsyncFunction("getPublicKey", this@SignatureModule::getPublicKey)
 
         AsyncFunction("isKeyPresentInKeychain", this@SignatureModule::isKeyPresentInKeychain)
 
@@ -64,13 +70,16 @@ class SignatureModule : Module() {
         AsyncFunction("verifyWithKey", this@SignatureModule::verifyWithKey)
     }
 
-    private fun generateEllipticCurveKeys(alias: String): PublicKey {
+    private fun generateKeys(keySpec: KeySpec): PublicKey {
         val parameterSpec = KeyGenParameterSpec.Builder(
-            alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+            keySpec.alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).run {
-            setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+            setDigests(KeyProperties.DIGEST_SHA256)
+            if (keySpec.algorithm == SignatureAlgorithm.RSA) {
+                setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
+            }
             setUserAuthenticationRequired(true)
-            setKeySize(KEY_SIZE)
+            setKeySize(keySpec.size)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 setInvalidatedByBiometricEnrollment(false)
             }
@@ -78,27 +87,47 @@ class SignatureModule : Module() {
         }
 
         val keyPair = KeyPairGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE
+            keySpec.algorithm.key, ANDROID_KEYSTORE
         ).run {
             initialize(parameterSpec)
             generateKeyPair()
         }
 
-        val publicKey = (keyPair.public as ECPublicKey).w.run {
-            PublicKey(affineX.toString(), affineY.toString())
-        }
+        return when (val publicKey = keyPair.public) {
+            is java.security.interfaces.ECPublicKey -> {
+                publicKey.w.run {
+                    ECPublicKey(affineX.toString(), affineY.toString())
+                }
+            }
 
-        return publicKey
+            is java.security.interfaces.RSAPublicKey -> {
+                publicKey.run {
+                    RSAPublicKey(modulus.toString(), publicExponent.toString())
+                }
+            }
+
+            else -> throw CodedException("Unsupported key type")
+        }
     }
 
-    private fun getEllipticCurvePublicKey(alias: String): PublicKey? {
-        val key = keyStore.getCertificate(alias)?.publicKey ?: return null
+    private fun getPublicKey(alias: String): PublicKey? {
+        val publicKey = keyStore.getCertificate(alias)?.publicKey ?: return null
 
-        val publicKey = (key as ECPublicKey).w.run {
-            PublicKey(affineX.toString(), affineY.toString())
+        return when (publicKey) {
+            is java.security.interfaces.ECPublicKey -> {
+                publicKey.w.run {
+                    ECPublicKey(affineX.toString(), affineY.toString())
+                }
+            }
+
+            is java.security.interfaces.RSAPublicKey -> {
+                publicKey.run {
+                    RSAPublicKey(modulus.toString(), publicExponent.toString())
+                }
+            }
+
+            else -> null
         }
-
-        return publicKey
     }
 
     private fun isKeyPresentInKeychain(alias: String): Boolean {
@@ -118,7 +147,10 @@ class SignatureModule : Module() {
 
     private suspend fun sign(data: ByteArray, alias: String, info: SignaturePrompt): ByteArray {
         val key = keyStore.getKey(alias, null) as PrivateKey
-        val cryptoObject = Signature.getInstance(SIGNATURE_ALGORITHM).run {
+
+        val algorithm = getKeyAlgorithm(key)
+
+        val cryptoObject = Signature.getInstance(algorithm).run {
             initSign(key)
             BiometricPrompt.CryptoObject(this)
         }
@@ -157,38 +189,70 @@ class SignatureModule : Module() {
     }
 
     private fun verify(data: ByteArray, signature: ByteArray, alias: String): Boolean {
-        val key = keyStore.getCertificate(alias)?.publicKey as? ECPublicKey
-        return Signature.getInstance(SIGNATURE_ALGORITHM).run {
+        val key = keyStore.getCertificate(alias)?.publicKey!!
+
+        val algorithm = getKeyAlgorithm(key)
+
+        return Signature.getInstance(algorithm).run {
             initVerify(key)
             update(data)
             verify(signature)
         }
     }
 
-    private fun verifyWithKey(data: ByteArray, signature: ByteArray, publicKey: PublicKey): Boolean {
-        val xInt = BigInteger(publicKey.x)
-        val yInt = BigInteger(publicKey.y)
-        val ecPoint = ECPoint(xInt, yInt)
+    private fun verifyWithKey(
+        data: ByteArray,
+        signature: ByteArray,
+        publicKey: Either<ECPublicKey, RSAPublicKey>
+    ): Boolean {
+        val key = publicKey.get(ECPublicKey::class).let {
+            val xInt = BigInteger(it.x)
+            val yInt = BigInteger(it.y)
+            val ecPoint = ECPoint(xInt, yInt)
 
-        val parameterSpec = AlgorithmParameters.getInstance(KeyProperties.KEY_ALGORITHM_EC).run {
-            init(ECGenParameterSpec(CURVE_SPEC));
-            getParameterSpec(ECParameterSpec::class.java)
+            val parameterSpec =
+                AlgorithmParameters.getInstance(KeyProperties.KEY_ALGORITHM_EC).run {
+                    init(ECGenParameterSpec(CURVE_SPEC));
+                    getParameterSpec(ECParameterSpec::class.java)
+                }
+
+            val publicKeySpec = ECPublicKeySpec(ecPoint, parameterSpec)
+
+            val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
+            keyFactory.generatePublic(publicKeySpec)
+        } ?: publicKey.get(RSAPublicKey::class).let {
+            val modulus = BigInteger(it.n)
+            val exponent = BigInteger(it.e)
+
+            val publicKeySpec = RSAPublicKeySpec(modulus, exponent)
+
+            val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_RSA)
+            keyFactory.generatePublic(publicKeySpec)
         }
 
-        val publicKeySpec = ECPublicKeySpec(ecPoint, parameterSpec)
 
-        val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
-        val key = keyFactory.generatePublic(publicKeySpec)
+        val algorithm = getKeyAlgorithm(key)
 
-        return Signature.getInstance(SIGNATURE_ALGORITHM).run {
+        return Signature.getInstance(algorithm).run {
             initVerify(key)
             update(data)
             verify(signature)
         }
     }
 
+    private fun getKeyAlgorithm(key: Key): String {
+        return when (key.algorithm) {
+            KeyProperties.KEY_ALGORITHM_EC -> "SHA256withECDSA"
+            KeyProperties.KEY_ALGORITHM_RSA -> "SHA256withRSA"
+            else -> throw UnsupportedAlgorithmException()
+        }
+    }
 }
 
 internal class AuthenticationFailedException : CodedException("Unrecognized user")
 
-internal class AuthenticationErrorException(errorCode: Int, errString: CharSequence) : CodedException("Authentication failed with code $errorCode: $errString")
+internal class AuthenticationErrorException(errorCode: Int, errString: CharSequence) :
+    CodedException("Authentication failed with code $errorCode: $errString")
+
+internal class UnsupportedAlgorithmException :
+    CodedException("Algorithm not available for this key")
