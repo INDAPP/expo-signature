@@ -1,12 +1,21 @@
 import SignatureModule from './SignatureModule';
-import { PublicKey, SignaturePrompt } from './SignatureModule.types';
+import {
+  ECPublicKey,
+  KeySpec,
+  PublicKey,
+  RSAPublicKey,
+  SignatureAlgorithm,
+  SignaturePrompt,
+} from './SignatureModule.types';
 
-export async function generateEllipticCurveKeys(alias: string): Promise<PublicKey> {
-  return await SignatureModule.generateEllipticCurveKeys(alias);
+export async function generateKeys<Algorithm extends SignatureAlgorithm>(
+  keySpec: KeySpec<Algorithm>
+): Promise<Algorithm extends 'EC' ? ECPublicKey : Algorithm extends 'RSA' ? RSAPublicKey : never> {
+  return await SignatureModule.generateKeys(keySpec);
 }
 
-export async function getEllipticCurvePublicKey(alias: string): Promise<PublicKey | null> {
-  return await SignatureModule.getEllipticCurvePublicKey(alias);
+export async function getPublicKey(alias: string): Promise<PublicKey | null> {
+  return await SignatureModule.getPublicKey(alias);
 }
 
 export async function isKeyPresentInKeychain(alias: string): Promise<boolean> {

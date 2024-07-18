@@ -1,4 +1,4 @@
-package expo.module.signature
+package expo.module.signature.models
 
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
