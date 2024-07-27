@@ -31,3 +31,23 @@ jobs:
           npx tsc -b tsconfig.json
           cd example
           npx tsc -b tsconfig.json
+  prebuild_android:
+    name: Expo prebuild Android
+    runs-on: ubuntu-latest
+    needs: [npm_lint, ts_check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
+      - name: Expo prebuild
+        working-directory: ./example
+        run: npm run prebuild -- --no-install --platform android
+  prebuild_ios:
+    name: Expo prebuild iOS
+    runs-on: ubuntu-latest
+    needs: [npm_lint, ts_check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
+      - name: Expo prebuild
+        working-directory: ./example
+        run: npm run prebuild -- --no-install --platform ios

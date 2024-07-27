@@ -2,7 +2,6 @@ name: Install NPM Packages
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v4
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
