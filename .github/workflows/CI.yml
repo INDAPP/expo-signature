@@ -16,29 +16,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
-  npm_lint:
-    name: TypeScript linter check
+  expo_lint:
+    name: ESLint check
     runs-on: ubuntu-latest
     needs: [npm_install]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
       - run: npm run lint
-  ts_check:
-    name: TypeScript compile
+  expo_build:
+    name: Build Expo module
     runs-on: ubuntu-latest
     needs: [npm_install]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
-      - run: |
-          npx tsc -b tsconfig.json
-          cd example
-          npx tsc -b tsconfig.json
+      - run: npm run build
   prebuild_android:
     name: Expo prebuild Android
     runs-on: ubuntu-latest
-    needs: [npm_lint, ts_check]
+    needs: [expo_lint, expo_build]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
@@ -48,7 +45,7 @@ jobs:
   prebuild_ios:
     name: Expo prebuild iOS
     runs-on: ubuntu-latest
-    needs: [npm_lint, ts_check]
+    needs: [expo_lint, expo_build]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
