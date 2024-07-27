@@ -12,3 +12,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
+  npm_lint:
+    name: TypeScript linter check
+    runs-on: ubuntu-latest
+    needs: [npm_install]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
+      - run: npm run lint
+  ts_check:
+    name: TypeScript compile
+    runs-on: ubuntu-latest
+    needs: [npm_install]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
+      - run: |
+          npx tsc -b tsconfig.json
+          cd example
+          npx tsc -b tsconfig.json
