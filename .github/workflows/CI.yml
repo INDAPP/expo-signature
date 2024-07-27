@@ -1,0 +1,14 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+
+jobs:
+  npm_install:
+    name: Install NPM packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
