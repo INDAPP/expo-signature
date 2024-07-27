@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'main' }}
+
 jobs:
   npm_install:
     name: Install NPM packages
