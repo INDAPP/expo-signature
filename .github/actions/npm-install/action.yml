@@ -1,0 +1,19 @@
+name: Install NPM Packages
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: '.node-version'
+        cache: 'npm'
+        cache-dependency-path: |
+          package-lock.json
+          example/package-lock.json
+    - name: Install node dependencies
+      shell: bash
+      run: npm ci --prefer-offline
+    - name: Install example app dependencies
+      working-directory: ./example
+      shell: bash
+      run: npm ci --prefer-offline

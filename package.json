@@ -9,7 +9,7 @@
     "clean": "expo-module clean",
     "lint": "expo-module lint",
     "test": "expo-module test",
-    "prepare": "expo-module prepare",
+    "prepare": "husky",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",
@@ -29,10 +29,14 @@
   "license": "MIT",
   "homepage": "https://github.com/INDAPP/expo-signature#readme",
   "devDependencies": {
+    "@commitlint/cli": "^19.3.0",
+    "@commitlint/config-conventional": "^19.2.2",
     "@types/react": "^18.0.25",
     "eslint-config-prettier": "^9.1.0",
     "expo-module-scripts": "^3.5.2",
     "expo-modules-core": "^1.12.17",
+    "husky": "^9.1.4",
+    "lint-staged": "^15.2.7",
     "prettier": "^3.3.2"
   },
   "peerDependencies": {
