@@ -1,0 +1,7 @@
+{
+    "**/*.{js,jsx,ts,tsx}": [
+      "npm run lint -- --fix --max-warnings=0",
+      "prettier --write"
+    ],
+    "**/*.{html,json,css,scss,md,mdx}": ["prettier -w"]
+}
