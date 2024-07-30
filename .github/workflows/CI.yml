@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
+  CP_HOME_DIR: ${{ github.workspace }}/.cocoapods
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'main' }}
@@ -64,3 +68,35 @@ jobs:
         with:
           cache-key: prebuild-ios-${{ needs.expo_fingerprint.outputs.fingerprint }}
           platform: ios
+  test_ios:
+    name: Test iOS
+    runs-on: macos-latest
+    needs: [expo_fingerprint, prebuild_ios]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
+      - name: Cache CocoaPods
+        id: cocoapods-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CP_HOME_DIR }}
+          key: ${{ runner.os }}-pods
+      - uses: actions/cache/restore@v3
+        with:
+          path: ./example/ios
+          key: prebuild-ios-${{ needs.expo_fingerprint.outputs.fingerprint }}
+      - uses: irgaly/xcode-cache@v1
+        with:
+          key: xcode-cache-deriveddata-${{ github.workflow }}-${{ github.sha }}
+          restore-keys: xcode-cache-deriveddata-${{ github.workflow }}-
+      - uses: ./.github/actions/npm-install
+      - name: Pod install
+        working-directory: ./example/ios
+        run: pod install
+      - name: Test iOS Module
+        working-directory: ./example
+        run: |
+          xcodebuild test \
+          -workspace ios/exposignatureexample.xcworkspace \
+          -scheme SignatureModule-Unit-Tests \
+          -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest'
