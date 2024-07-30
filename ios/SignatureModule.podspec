@@ -24,5 +24,10 @@ Pod::Spec.new do |s|
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
 
-  s.source_files = "**/*.{h,m,swift}"
+  s.source_files = "Module/**/*.{h,m,swift}"
+  
+  s.test_spec 'Tests' do |test_spec|
+    test_spec.requires_app_host = true
+    test_spec.source_files = 'Tests/**/*.{h,m,swift}'
+  end
 end
