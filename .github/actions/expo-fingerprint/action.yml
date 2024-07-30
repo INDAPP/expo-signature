@@ -1,0 +1,16 @@
+name: Expo Fingerprint
+description: Generate fingerprint hash value
+outputs:
+  fingerprint:
+    description: Expo fingerprint general hash value
+    value: ${{ steps.expo-fingerprint.outputs.fingerprint }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Expo fingerprint
+      id: expo-fingerprint
+      working-directory: ./example
+      shell: bash
+      run: |
+        export FINGERPRINT=$(npm run fingerprint | grep -o '"hash": "[^"]*"' | awk -F'"' 'END {print $4}')
+        echo "fingerprint=$(echo $FINGERPRINT)" >> $GITHUB_OUTPUT

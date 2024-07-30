@@ -1,0 +1,24 @@
+name: Expo Prebuild
+description: Generate native folder for android or ios
+inputs:
+  platform:
+    description: Should be android or ios
+    required: true
+  cache-key:
+    description: Cache prebuild folder if set
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Expo prebuild cache
+      uses: actions/cache@v4
+      if: ${{ inputs.cache-key != '' }}
+      with:
+        path: ./example/${{ inputs.platform }}
+        key: ${{ inputs.cache-key }}
+    - name: Expo prebuild
+      env:
+        PLATFORM: ${{ inputs.platform }}
+      working-directory: ./example
+      shell: bash
+      run: npm run prebuild -- --no-install --platform $PLATFORM
