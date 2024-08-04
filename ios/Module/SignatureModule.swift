@@ -1,6 +1,5 @@
 import ExpoModulesCore
 import CryptoKit
-import BigInt
 import LocalAuthentication
 
 private let kKeySize = 256
@@ -24,7 +23,8 @@ public class SignatureModule: Module {
         AsyncFunction("verifyWithKey", verifyWithKey)
     }
     
-    private func generateKeys(keySpec: KeySpec) throws -> PublicKey {
+    @discardableResult
+    internal func generateKeys(keySpec: KeySpec) throws -> PublicKey {
         var error: Unmanaged<CFError>?
         
         guard let access = SecAccessControlCreateWithFlags(
@@ -67,7 +67,7 @@ public class SignatureModule: Module {
         }
     }
     
-    private func getPublicKey(alias: String) throws -> PublicKey? {
+    internal func getPublicKey(alias: String) throws -> PublicKey? {
         let (status, item) = queryForKey(alias: alias)
         
         guard status != errSecItemNotFound else {
@@ -102,13 +102,14 @@ public class SignatureModule: Module {
         
     }
     
-    private func isKeyPresentInKeychain(alias: String) -> Bool {
+    internal func isKeyPresentInKeychain(alias: String) -> Bool {
         let (status, _) = queryForKey(alias: alias)
         
         return status == errSecSuccess
     }
     
-    private func deleteKey(alias: String) -> Bool {
+    @discardableResult
+    internal func deleteKey(alias: String) -> Bool {
         let tag = alias.data(using: .utf8)!
         
         let query: NSDictionary = [
@@ -121,7 +122,7 @@ public class SignatureModule: Module {
         return status == errSecSuccess
     }
     
-    private func sign(data: Data, alias: String, info: SignaturePrompt) throws -> Data {
+    internal func sign(data: Data, alias: String, info: SignaturePrompt) throws -> Data {
         let context = LAContext()
         let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
         context.localizedReason = reason
@@ -148,7 +149,7 @@ public class SignatureModule: Module {
         return signature
     }
     
-    private func verify(data: Data, signature: Data, alias: String) throws -> Bool {
+    internal func verify(data: Data, signature: Data, alias: String) throws -> Bool {
         let (status, item) = queryForKey(alias: alias)
         
         guard status == errSecSuccess else {
@@ -175,7 +176,7 @@ public class SignatureModule: Module {
         return verified
     }
     
-    private func verifyWithKey(data: Data, signature: Data, publicKey: Either<ECPublicKey, RSAPublicKey>) throws -> Bool {
+    internal func verifyWithKey(data: Data, signature: Data, publicKey: Either<ECPublicKey, RSAPublicKey>) throws -> Bool {
         var keyData: Data!
         var type: CFString!
         if let ecPublicKey: ECPublicKey = publicKey.get() {

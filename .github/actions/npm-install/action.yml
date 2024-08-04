@@ -1,4 +1,5 @@
 name: Install NPM Packages
+description: Install npm in main and example project
 runs:
   using: 'composite'
   steps:

@@ -31,7 +31,6 @@ extension Data {
         asn1Data.append(sequenceData)
         
         self.init(asn1Data)
-        
     }
     
     func toRsaParams() throws -> (modulus: Data, exponent: Data) {

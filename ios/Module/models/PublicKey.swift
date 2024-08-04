@@ -48,17 +48,17 @@ struct RSAPublicKey: PublicKey {
     init(data: Data) throws {
         let (modulusData, exponentData) = try data.toRsaParams()
         
-        n = BigUInt(modulusData).description
+        n = BigInt(modulusData).description
         e = BigUInt(exponentData).description
     }
     
     func asData() throws -> Data {
         guard let nInt = BigInt(n),
-              let eInt = BigInt(e) else {
+              let eInt = BigUInt(e) else {
             throw PublicKeyException(.invalidCoordinates)
         }
-        let modulusData = nInt.magnitude.serialize()
-        let exponentData = eInt.magnitude.serialize()
+        let modulusData = nInt.serialize()
+        let exponentData = eInt.serialize()
 
         return Data(modulus: modulusData, exponent: exponentData)
     }

@@ -24,6 +24,20 @@
     },
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "SignatureModule",
+                "path": "../../ios",
+                "testspecs": ["Tests"]
+              }
+            ]
+          }
+        }
+      ],
+      [
         "../app.plugin.js",
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
