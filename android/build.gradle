@@ -36,12 +36,16 @@ android {
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
   }
   lintOptions {
     abortOnError false
   }
 }
 
+def androidXTestVersion = "1.6.1"
 dependencies {
+  androidTestImplementation "androidx.test:runner:$androidXTestVersion"
+  androidTestImplementation "androidx.test:rules:$androidXTestVersion"
   implementation "androidx.biometric:biometric-ktx:1.2.0-alpha05"
 }
