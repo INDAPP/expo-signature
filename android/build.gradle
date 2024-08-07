@@ -36,12 +36,18 @@ android {
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
   }
   lintOptions {
     abortOnError false
   }
 }
 
+def androidXTestVersion = "1.6.1"
+def coroutines_version = "1.6.4"
 dependencies {
+  androidTestImplementation "androidx.test:runner:$androidXTestVersion"
+  androidTestImplementation "androidx.test:rules:$androidXTestVersion"
+  androidTestImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutines_version"
   implementation "androidx.biometric:biometric-ktx:1.2.0-alpha05"
 }
