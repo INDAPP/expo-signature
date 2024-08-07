@@ -6,9 +6,9 @@ import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 
 class SignaturePrompt(
-    @Field val title: String?,
-    @Field val subtitle: String?,
-    @Field val cancel: String?,
+    @Field val title: String? = null,
+    @Field val subtitle: String? = null,
+    @Field val cancel: String? = null,
 ): Record {
     fun getPromptInfo(): BiometricPrompt.PromptInfo = BiometricPrompt.PromptInfo.Builder().run {
         title?.let { setTitle(it) }

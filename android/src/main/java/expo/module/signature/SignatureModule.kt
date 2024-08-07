@@ -13,6 +13,7 @@ import expo.module.signature.models.PublicKey
 import expo.module.signature.models.RSAPublicKey
 import expo.module.signature.models.SignaturePrompt
 import expo.modules.core.interfaces.ActivityProvider
+import expo.modules.kotlin.apifeatures.EitherType
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
@@ -42,10 +43,11 @@ const val ANDROID_KEYSTORE = "AndroidKeyStore"
 const val CURVE_SPEC = "secp256r1"
 
 class SignatureModule : Module() {
-    private lateinit var mActivityProvider: ActivityProvider
+    internal lateinit var mActivityProvider: ActivityProvider
 
     private val keyStore get() = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
+    @OptIn(EitherType::class)
     override fun definition() = ModuleDefinition {
         Name("ExpoSignature")
 
@@ -70,7 +72,7 @@ class SignatureModule : Module() {
         AsyncFunction("verifyWithKey", this@SignatureModule::verifyWithKey)
     }
 
-    private fun generateKeys(keySpec: KeySpec): PublicKey {
+    internal fun generateKeys(keySpec: KeySpec): PublicKey {
         val parameterSpec = KeyGenParameterSpec.Builder(
             keySpec.alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).run {
@@ -110,7 +112,7 @@ class SignatureModule : Module() {
         }
     }
 
-    private fun getPublicKey(alias: String): PublicKey? {
+    internal fun getPublicKey(alias: String): PublicKey? {
         val publicKey = keyStore.getCertificate(alias)?.publicKey ?: return null
 
         return when (publicKey) {
@@ -130,11 +132,11 @@ class SignatureModule : Module() {
         }
     }
 
-    private fun isKeyPresentInKeychain(alias: String): Boolean {
+    internal fun isKeyPresentInKeychain(alias: String): Boolean {
         return keyStore.isKeyEntry(alias)
     }
 
-    private fun deleteKey(alias: String): Boolean {
+    internal fun deleteKey(alias: String): Boolean {
         val keyStore = this.keyStore
 
         if (!keyStore.isKeyEntry(alias)) {
@@ -145,7 +147,7 @@ class SignatureModule : Module() {
         return true
     }
 
-    private suspend fun sign(data: ByteArray, alias: String, info: SignaturePrompt): ByteArray {
+    internal suspend fun sign(data: ByteArray, alias: String, info: SignaturePrompt): ByteArray {
         val key = keyStore.getKey(alias, null) as PrivateKey
 
         val algorithm = getKeyAlgorithm(key)
@@ -188,7 +190,7 @@ class SignatureModule : Module() {
         }
     }
 
-    private fun verify(data: ByteArray, signature: ByteArray, alias: String): Boolean {
+    internal fun verify(data: ByteArray, signature: ByteArray, alias: String): Boolean {
         val key = keyStore.getCertificate(alias)?.publicKey!!
 
         val algorithm = getKeyAlgorithm(key)
@@ -200,7 +202,8 @@ class SignatureModule : Module() {
         }
     }
 
-    private fun verifyWithKey(
+    @OptIn(EitherType::class)
+    internal fun verifyWithKey(
         data: ByteArray,
         signature: ByteArray,
         publicKey: Either<ECPublicKey, RSAPublicKey>
