@@ -68,6 +68,55 @@ jobs:
         with:
           cache-key: prebuild-ios-${{ needs.expo_fingerprint.outputs.fingerprint }}
           platform: ios
+  test_android:
+    name: Test Android
+    # Can't run on macos-latest: https://github.com/ReactiveCircus/android-emulator-runner/issues/392
+    runs-on: macos-13
+    needs: [expo_fingerprint, prebuild_android]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/npm-install
+      - uses: actions/cache/restore@v4
+        with:
+          path: ./example/android
+          key: prebuild-android-${{ needs.expo_fingerprint.outputs.fingerprint }}
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Build with Gradle
+        working-directory: ./example/android
+        run: ./gradlew expo-signature:build --stacktrace
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-34-${{ runner.os }}
+          restore-keys: avd-34-
+      - name: Test Android Module
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          target: google_apis
+          arch: x86_64
+          working-directory: ./example/android
+          script: ./gradlew expo-signature:connectedAndroidTest
+          disable-animations: true
   test_ios:
     name: Test iOS
     runs-on: macos-latest
@@ -81,7 +130,7 @@ jobs:
         with:
           path: ${{ env.CP_HOME_DIR }}
           key: ${{ runner.os }}-pods
-      - uses: actions/cache/restore@v3
+      - uses: actions/cache/restore@v4
         with:
           path: ./example/ios
           key: prebuild-ios-${{ needs.expo_fingerprint.outputs.fingerprint }}
