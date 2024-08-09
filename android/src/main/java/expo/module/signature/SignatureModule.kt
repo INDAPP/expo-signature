@@ -43,7 +43,8 @@ const val ANDROID_KEYSTORE = "AndroidKeyStore"
 const val CURVE_SPEC = "secp256r1"
 
 class SignatureModule : Module() {
-    internal lateinit var mActivityProvider: ActivityProvider
+    private lateinit var mActivityProvider: ActivityProvider
+    internal var biometryEnabled = true
 
     private val keyStore get() = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
@@ -80,7 +81,7 @@ class SignatureModule : Module() {
             if (keySpec.algorithm == SignatureAlgorithm.RSA) {
                 setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
             }
-            setUserAuthenticationRequired(true)
+            setUserAuthenticationRequired(biometryEnabled)
             setKeySize(keySpec.size)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 setInvalidatedByBiometricEnrollment(false)
@@ -152,15 +153,17 @@ class SignatureModule : Module() {
 
         val algorithm = getKeyAlgorithm(key)
 
-        val cryptoObject = Signature.getInstance(algorithm).run {
+        var cryptoObject = Signature.getInstance(algorithm).run {
             initSign(key)
             BiometricPrompt.CryptoObject(this)
         }
 
-        val promptInfo = info.getPromptInfo()
-        val authCryptoObject = authWithBiometric(cryptoObject, promptInfo)
+        if (biometryEnabled) {
+            val promptInfo = info.getPromptInfo()
+            cryptoObject = authWithBiometric(cryptoObject, promptInfo)
+        }
 
-        return authCryptoObject.signature!!.run {
+        return cryptoObject.signature!!.run {
             update(data)
             sign()
         }
