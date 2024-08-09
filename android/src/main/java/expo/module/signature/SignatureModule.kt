@@ -156,37 +156,43 @@ class SignatureModule : Module() {
             initSign(key)
             BiometricPrompt.CryptoObject(this)
         }
+
         val promptInfo = info.getPromptInfo()
+        val authCryptoObject = authWithBiometric(cryptoObject, promptInfo)
 
-        return withContext(Dispatchers.Main) {
-            suspendCoroutine { continuation ->
-                val activity = mActivityProvider.currentActivity as FragmentActivity
-                val executor = ContextCompat.getMainExecutor(activity)
-                val prompt = BiometricPrompt(activity,
-                    executor,
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                            val signature = result.cryptoObject!!.signature!!.run {
-                                update(data)
-                                sign()
-                            }
-                            continuation.resume(signature)
-                        }
+        return authCryptoObject.signature!!.run {
+            update(data)
+            sign()
+        }
+    }
 
-                        override fun onAuthenticationFailed() {
-                            continuation.resumeWithException(AuthenticationFailedException())
-                        }
+    private suspend fun authWithBiometric(
+        cryptoObject: BiometricPrompt.CryptoObject,
+        promptInfo: BiometricPrompt.PromptInfo
+    ): BiometricPrompt.CryptoObject = withContext(Dispatchers.Main) {
+        suspendCoroutine { continuation ->
+            val activity = mActivityProvider.currentActivity as FragmentActivity
+            val executor = ContextCompat.getMainExecutor(activity)
+            val prompt = BiometricPrompt(activity,
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        continuation.resume(result.cryptoObject!!)
+                    }
 
-                        override fun onAuthenticationError(
-                            errorCode: Int, errString: CharSequence
-                        ) {
-                            continuation.resumeWithException(
-                                AuthenticationErrorException(errorCode, errString)
-                            )
-                        }
-                    })
-                prompt.authenticate(promptInfo, cryptoObject)
-            }
+                    override fun onAuthenticationFailed() {
+                        continuation.resumeWithException(AuthenticationFailedException())
+                    }
+
+                    override fun onAuthenticationError(
+                        errorCode: Int, errString: CharSequence
+                    ) {
+                        continuation.resumeWithException(
+                            AuthenticationErrorException(errorCode, errString)
+                        )
+                    }
+                })
+            prompt.authenticate(promptInfo, cryptoObject)
         }
     }
 
