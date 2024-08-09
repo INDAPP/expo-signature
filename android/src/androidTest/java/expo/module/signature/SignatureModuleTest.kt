@@ -42,6 +42,7 @@ class SignatureModuleTest {
     @Before
     fun setUp() {
         module = SignatureModule()
+        module.biometryEnabled = false
     }
 
     @After
