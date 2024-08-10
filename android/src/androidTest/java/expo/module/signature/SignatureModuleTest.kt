@@ -6,8 +6,9 @@ import expo.module.signature.models.RSAPublicKey
 import expo.module.signature.models.SignatureAlgorithm
 import expo.module.signature.models.SignaturePrompt
 import expo.modules.kotlin.apifeatures.EitherType
-import expo.modules.kotlin.types.EitherTypeConverter
-import expo.modules.kotlin.types.TypeConverterProviderImpl
+import expo.modules.kotlin.types.Either
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -19,7 +20,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
-import kotlin.reflect.typeOf
+
+@OptIn(EitherType::class)
+inline fun <reified FirstType : Any, reified SecondType : Any> mockEitherFirstType(value: FirstType): Either<FirstType, SecondType> {
+    val either = mockk<Either<FirstType, SecondType>>(relaxed = true)
+    every { either.get(FirstType::class) } returns value
+    every { either.`is`(FirstType::class) } returns true
+    return either
+}
+
+@OptIn(EitherType::class)
+inline fun <reified FirstType : Any, reified SecondType : Any> mockEitherSecondType(value: SecondType): Either<FirstType, SecondType> {
+    val either = mockk<Either<FirstType, SecondType>>(relaxed = true)
+    every { either.get(SecondType::class) } returns value
+    every { either.`is`(SecondType::class) } returns true
+    return either
+}
 
 class SignatureModuleTest {
     private val alias = "TestKeyAlias"
@@ -50,28 +66,28 @@ class SignatureModuleTest {
         module.deleteKey(alias)
     }
 
-    @Test()
+    @Test
     fun testEcKeysGenerationType() {
         val publicKey = module.generateKeys(ec256KeySpec)
 
         assertTrue("Generated key type is not EC", publicKey is ECPublicKey)
     }
 
-    @Test()
+    @Test
     fun testRsaKeysGenerationType() {
         val publicKey = module.generateKeys(rsa2048KeySpec)
 
         assertTrue("Generated key type is not RSA", publicKey is RSAPublicKey)
     }
 
-    @Test()
+    @Test
     fun testNoKeyRetrieval() {
         val publicKey = module.getPublicKey(alias)
 
         assertNull("Unknow key retrieved from keychain", publicKey)
     }
 
-    @Test()
+    @Test
     fun testEcPublicKeyRetrieval() {
         module.generateKeys(ec256KeySpec)
         val publicKey = module.getPublicKey(alias)
@@ -80,7 +96,7 @@ class SignatureModuleTest {
         assertTrue("Retrieved key type is not EC", publicKey is ECPublicKey)
     }
 
-    @Test()
+    @Test
     fun testRsaPublicKeyRetrieval() {
         module.generateKeys(rsa2048KeySpec)
         val publicKey = module.getPublicKey(alias)
@@ -89,14 +105,14 @@ class SignatureModuleTest {
         assertTrue("Retrieved key type is not RSA", publicKey is RSAPublicKey)
     }
 
-    @Test()
+    @Test
     fun testKeyAbsence() {
         val isPresent = module.isKeyPresentInKeychain(alias)
 
         assertFalse("Key alias shouldn't be present in keychain", isPresent)
     }
 
-    @Test()
+    @Test
     fun testEcPublicKeyPresence() {
         module.generateKeys(ec256KeySpec)
         val isPresent = module.isKeyPresentInKeychain(alias)
@@ -104,7 +120,7 @@ class SignatureModuleTest {
         assertTrue("EC public key is not present in keychain", isPresent)
     }
 
-    @Test()
+    @Test
     fun testRsaPublicKeyPresence() {
         module.generateKeys(rsa2048KeySpec)
         val isPresent = module.isKeyPresentInKeychain(alias)
@@ -112,7 +128,7 @@ class SignatureModuleTest {
         assertTrue("RSA public key is not present in keychain", isPresent)
     }
 
-    @Test()
+    @Test
     fun testEcKeyDevalion() {
         module.generateKeys(ec256KeySpec)
         val devaled = module.deleteKey(alias)
@@ -123,7 +139,7 @@ class SignatureModuleTest {
         assertTrue("Wrong EC key devalion return value", devaled)
     }
 
-    @Test()
+    @Test
     fun testRsaKeyDeletion() {
         module.generateKeys(rsa2048KeySpec)
         val devaled = module.deleteKey(alias)
@@ -134,14 +150,14 @@ class SignatureModuleTest {
         assertTrue("Wrong RSA key devalion return value", devaled)
     }
 
-    @Test()
+    @Test
     fun testNoKeyDeletion() {
         val deleted = module.deleteKey(alias)
 
         assertFalse("Unexpected key devalion", deleted)
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testEcKeySigning() = runTest {
         module.generateKeys(ec256KeySpec)
@@ -155,7 +171,7 @@ class SignatureModuleTest {
         }
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testRsaKeySigning() = runTest {
         module.generateKeys(rsa2048KeySpec)
@@ -169,7 +185,7 @@ class SignatureModuleTest {
         }
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testEcSigningDifference() = runTest {
         module.generateKeys(ec256KeySpec)
@@ -181,7 +197,7 @@ class SignatureModuleTest {
         )
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testRsaSigningEquality() = runTest {
         module.generateKeys(rsa2048KeySpec)
@@ -193,7 +209,7 @@ class SignatureModuleTest {
         )
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testEcKeyVerify() = runTest {
         module.generateKeys(ec256KeySpec)
@@ -203,7 +219,7 @@ class SignatureModuleTest {
         assertTrue("Cannot verify EC signed data", verified)
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testRsaKeyVerify() = runTest {
         module.generateKeys(rsa2048KeySpec)
@@ -213,39 +229,31 @@ class SignatureModuleTest {
         assertTrue("Cannot verify RSA signed data", verified)
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class, EitherType::class)
     fun testExternalEcKeyVerify() = runTest {
         val publicKey = module.generateKeys(ec256KeySpec)
         val signature = module.sign(dataToSign, alias, signaturePrompt)
         module.deleteKey(alias)
+        val either = mockEitherFirstType<ECPublicKey, RSAPublicKey>(publicKey as ECPublicKey)
 
-        val ecPublicKeyConverter = EitherTypeConverter<ECPublicKey, RSAPublicKey>(
-            TypeConverterProviderImpl, typeOf<ECPublicKey>()
-        )
         val verified = module.verifyWithKey(
-            dataToSign,
-            signature,
-            ecPublicKeyConverter.convertNonOptional(publicKey, module.appContext)
+            dataToSign, signature, either
         )
 
         assertTrue("Cannot verify data signed with external EC key", verified)
     }
 
-    @Test()
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class, EitherType::class)
     fun testExternalRsaKeyVerify() = runTest {
         val publicKey = module.generateKeys(rsa2048KeySpec)
         val signature = module.sign(dataToSign, alias, signaturePrompt)
         module.deleteKey(alias)
+        val either = mockEitherSecondType<ECPublicKey, RSAPublicKey>(publicKey as RSAPublicKey)
 
-        val rsaPublicKeyConverter = EitherTypeConverter<ECPublicKey, RSAPublicKey>(
-            TypeConverterProviderImpl, typeOf<RSAPublicKey>()
-        )
         val verified = module.verifyWithKey(
-            dataToSign,
-            signature,
-            rsaPublicKeyConverter.convertNonOptional(publicKey, module.appContext)
+            dataToSign, signature, either
         )
 
         assertTrue("Cannot verify data signed with external RSA key", verified)

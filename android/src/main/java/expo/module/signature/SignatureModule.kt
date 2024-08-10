@@ -170,13 +170,13 @@ class SignatureModule : Module() {
     }
 
     private suspend fun authWithBiometric(
-        cryptoObject: BiometricPrompt.CryptoObject,
-        promptInfo: BiometricPrompt.PromptInfo
+        cryptoObject: BiometricPrompt.CryptoObject, promptInfo: BiometricPrompt.PromptInfo
     ): BiometricPrompt.CryptoObject = withContext(Dispatchers.Main) {
         suspendCoroutine { continuation ->
             val activity = mActivityProvider.currentActivity as FragmentActivity
             val executor = ContextCompat.getMainExecutor(activity)
-            val prompt = BiometricPrompt(activity,
+            val prompt = BiometricPrompt(
+                activity,
                 executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -213,33 +213,35 @@ class SignatureModule : Module() {
 
     @OptIn(EitherType::class)
     internal fun verifyWithKey(
-        data: ByteArray,
-        signature: ByteArray,
-        publicKey: Either<ECPublicKey, RSAPublicKey>
+        data: ByteArray, signature: ByteArray, publicKey: Either<ECPublicKey, RSAPublicKey>
     ): Boolean {
-        val key = publicKey.get(ECPublicKey::class).let {
-            val xInt = BigInteger(it.x)
-            val yInt = BigInteger(it.y)
-            val ecPoint = ECPoint(xInt, yInt)
+        val key = if (publicKey.`is`(ECPublicKey::class)) {
+            publicKey.get(ECPublicKey::class).let {
+                val xInt = BigInteger(it.x)
+                val yInt = BigInteger(it.y)
+                val ecPoint = ECPoint(xInt, yInt)
 
-            val parameterSpec =
-                AlgorithmParameters.getInstance(KeyProperties.KEY_ALGORITHM_EC).run {
-                    init(ECGenParameterSpec(CURVE_SPEC));
-                    getParameterSpec(ECParameterSpec::class.java)
-                }
+                val parameterSpec =
+                    AlgorithmParameters.getInstance(KeyProperties.KEY_ALGORITHM_EC).run {
+                        init(ECGenParameterSpec(CURVE_SPEC));
+                        getParameterSpec(ECParameterSpec::class.java)
+                    }
 
-            val publicKeySpec = ECPublicKeySpec(ecPoint, parameterSpec)
+                val publicKeySpec = ECPublicKeySpec(ecPoint, parameterSpec)
 
-            val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
-            keyFactory.generatePublic(publicKeySpec)
-        } ?: publicKey.get(RSAPublicKey::class).let {
-            val modulus = BigInteger(it.n)
-            val exponent = BigInteger(it.e)
+                val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
+                keyFactory.generatePublic(publicKeySpec)
+            }
+        } else {
+            publicKey.get(RSAPublicKey::class).let {
+                val modulus = BigInteger(it.n)
+                val exponent = BigInteger(it.e)
 
-            val publicKeySpec = RSAPublicKeySpec(modulus, exponent)
+                val publicKeySpec = RSAPublicKeySpec(modulus, exponent)
 
-            val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_RSA)
-            keyFactory.generatePublic(publicKeySpec)
+                val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_RSA)
+                keyFactory.generatePublic(publicKeySpec)
+            }
         }
 
 

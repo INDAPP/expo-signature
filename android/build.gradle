@@ -41,13 +41,22 @@ android {
   lintOptions {
     abortOnError false
   }
+  packagingOptions {
+    resources {
+      merges += "META-INF/LICENSE.md"
+      merges += "META-INF/LICENSE-notice.md"
+    }
+  }
 }
 
 def androidXTestVersion = "1.6.1"
 def coroutines_version = "1.6.4"
+def mockkVersion = "1.13.12"
 dependencies {
   androidTestImplementation "androidx.test:runner:$androidXTestVersion"
   androidTestImplementation "androidx.test:rules:$androidXTestVersion"
   androidTestImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutines_version"
+  androidTestImplementation "io.mockk:mockk-android:${mockkVersion}"
+  androidTestImplementation "io.mockk:mockk-agent:${mockkVersion}"
   implementation "androidx.biometric:biometric-ktx:1.2.0-alpha05"
 }
