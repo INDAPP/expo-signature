@@ -94,18 +94,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-      - name: Build with Gradle
-        working-directory: ./example/android
-        run: ./gradlew expo-signature:build --stacktrace
-      - name: AVD cache
-        uses: actions/cache@v4
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-34-${{ runner.os }}
-          restore-keys: avd-34-
       - name: Test Android Module
         uses: reactivecircus/android-emulator-runner@v2
         with:
