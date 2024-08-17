@@ -9,6 +9,7 @@ import expo.modules.kotlin.apifeatures.EitherType
 import expo.modules.kotlin.types.Either
 import io.mockk.every
 import io.mockk.mockk
+import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -129,32 +130,32 @@ class SignatureModuleTest {
     }
 
     @Test
-    fun testEcKeyDevalion() {
+    fun testEcKeyDeletion() {
         module.generateKeys(ec256KeySpec)
-        val devaled = module.deleteKey(alias)
+        val deleted = module.deleteKey(alias)
 
         assertFalse(
-            "EC key still present after devalion", module.isKeyPresentInKeychain(alias)
+            "EC key still present after deletion", module.isKeyPresentInKeychain(alias)
         )
-        assertTrue("Wrong EC key devalion return value", devaled)
+        assertTrue("Wrong EC key deletion return value", deleted)
     }
 
     @Test
     fun testRsaKeyDeletion() {
         module.generateKeys(rsa2048KeySpec)
-        val devaled = module.deleteKey(alias)
+        val deleted = module.deleteKey(alias)
 
         assertFalse(
-            "RSA key still present after devalion", module.isKeyPresentInKeychain(alias)
+            "RSA key still present after deletion", module.isKeyPresentInKeychain(alias)
         )
-        assertTrue("Wrong RSA key devalion return value", devaled)
+        assertTrue("Wrong RSA key deletion return value", deleted)
     }
 
     @Test
     fun testNoKeyDeletion() {
         val deleted = module.deleteKey(alias)
 
-        assertFalse("Unexpected key devalion", deleted)
+        assertFalse("Unexpected key deletion", deleted)
     }
 
     @Test
@@ -163,9 +164,11 @@ class SignatureModuleTest {
         module.generateKeys(ec256KeySpec)
 
         try {
-            module.sign(
+            val signature = module.sign(
                 dataToSign, alias, signaturePrompt
             )
+            assertTrue("Unexpected signature length", signature.size >= 70)
+            assertTrue("Unexpected signature length", signature.size <= 72)
         } catch (e: Exception) {
             fail("Error in EC signing")
         }
@@ -177,9 +180,10 @@ class SignatureModuleTest {
         module.generateKeys(rsa2048KeySpec)
 
         try {
-            module.sign(
+            val signature = module.sign(
                 dataToSign, alias, signaturePrompt
             )
+            assertEquals("Unexpected signature length", 256, signature.size)
         } catch (e: Exception) {
             fail("Error in RSA signing")
         }
