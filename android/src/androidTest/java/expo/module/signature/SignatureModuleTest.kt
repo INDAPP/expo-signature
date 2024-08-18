@@ -9,6 +9,7 @@ import expo.modules.kotlin.apifeatures.EitherType
 import expo.modules.kotlin.types.Either
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.spyk
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -58,8 +59,9 @@ class SignatureModuleTest {
 
     @Before
     fun setUp() {
-        module = SignatureModule()
-        module.biometryEnabled = false
+        module = spyk(SignatureModule(), recordPrivateCalls = true)
+        every { module getProperty "hasStrongBox" } propertyType Boolean::class answers { false }
+        every { module getProperty "userAuthenticationRequired" } propertyType Boolean::class answers { false }
     }
 
     @After
