@@ -134,13 +134,24 @@ final class SignatureModuleTests: XCTestCase {
     func testEcKeySigning() throws {
         try module.generateKeys(keySpec: ec256KeySpec)
         
-        XCTAssertNoThrow(try module.sign(data: dataToSign, alias: alias, info: signaturePrompt), "Error in EC signing")
+        do {
+            let signature = try module.sign(data: dataToSign, alias: alias, info: signaturePrompt)
+            XCTAssertTrue(signature.count >= 70, "Unexpected signature length")
+            XCTAssertTrue(signature.count <= 72, "Unexpected signature length")
+        } catch {
+            XCTFail("Error in EC signing")
+        }
     }
     
     func testRsaKeySigning() throws {
         try module.generateKeys(keySpec: rsa2048KeySpec)
         
-        XCTAssertNoThrow(try module.sign(data: dataToSign, alias: alias, info: signaturePrompt), "Error in RSA signing")
+        do {
+            let signature = try module.sign(data: dataToSign, alias: alias, info: signaturePrompt)
+            XCTAssertEqual(256, signature.count, "Unexpected signature length")
+        } catch {
+            XCTFail("Error in RSA signing")
+        }
     }
     
     func testEcSigningDifference() throws {
