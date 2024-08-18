@@ -132,17 +132,8 @@ function stringToUint8Array(str: string): Uint8Array {
   return encoder.encode(str);
 }
 
-// function uInt8ArrayToString(data: Uint8Array): string {
-//   const decoder = new TextDecoder();
-//   return decoder.decode(data);
-// }
-
 function uInt8ArrayToHexString(data: Uint8Array): string {
   return Array.from(data)
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join(':');
 }
-
-// function hexStringToUint8Array(str: string): Uint8Array {
-//   return new Uint8Array(str.split(":").map((byte) => parseInt(byte, 16)));
-// }
