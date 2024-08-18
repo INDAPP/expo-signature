@@ -18,13 +18,19 @@ const data = encoder.encode('Data to sign');
 #### Generate Key Pair
 
 ```ts
-const publicKey: PublicKey = await Signature.generateEllipticCurveKeys(alias);
+const keySpec: KeySpec = {
+  alias: keyAlias,
+  algorithm: 'EC', // or 'RSA'
+  size: 256, // or 2048 for 'RSA'
+};
+
+const publicKey: PublicKey = await Signature.generateKeys(alias);
 ```
 
 #### Retrieve an existing Public Key
 
 ```ts
-const publicKey: PublicKey | null = await Signature.getEllipticCurvePublicKey(alias);
+const publicKey: PublicKey | null = await Signature.getPublicKey(alias);
 ```
 
 #### Check for key presence
@@ -60,7 +66,7 @@ const isValid: boolean = await Signature.verifyData(data, signature, alias);
 #### Verify with Public Key
 
 ```ts
-const publicKey: PublicKey = {
+const publicKey: ECPublicKey = {
   x: '1234567890...',
   y: '0987654321...',
 };
