@@ -1,8 +1,10 @@
 package expo.module.signature
 
+import android.content.pm.PackageManager
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -44,7 +46,14 @@ const val CURVE_SPEC = "secp256r1"
 
 class SignatureModule : Module() {
     private lateinit var mActivityProvider: ActivityProvider
-    internal var biometryEnabled = true
+
+    private val userAuthenticationRequired
+        get() = true
+
+    private val hasStrongBox: Boolean
+        @RequiresApi(Build.VERSION_CODES.P) get() = appContext.reactContext!!.packageManager.hasSystemFeature(
+            PackageManager.FEATURE_STRONGBOX_KEYSTORE
+        )
 
     private val keyStore get() = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
@@ -78,11 +87,14 @@ class SignatureModule : Module() {
             keySpec.alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).run {
             setDigests(KeyProperties.DIGEST_SHA256)
+            setUserAuthenticationRequired(userAuthenticationRequired)
+            setKeySize(keySpec.size)
             if (keySpec.algorithm == SignatureAlgorithm.RSA) {
                 setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
             }
-            setUserAuthenticationRequired(biometryEnabled)
-            setKeySize(keySpec.size)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && hasStrongBox) {
+                setIsStrongBoxBacked(true)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 setInvalidatedByBiometricEnrollment(false)
             }
@@ -158,7 +170,7 @@ class SignatureModule : Module() {
             BiometricPrompt.CryptoObject(this)
         }
 
-        if (biometryEnabled) {
+        if (userAuthenticationRequired) {
             val promptInfo = info.getPromptInfo()
             cryptoObject = authWithBiometric(cryptoObject, promptInfo)
         }
