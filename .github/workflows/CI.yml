@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/npm-install
-      - run: npm run lint
+      - run: npm run lint -- --max-warnings 0
   expo_build:
     name: Build Expo module
     runs-on: ubuntu-latest
