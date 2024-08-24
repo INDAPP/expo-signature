@@ -4,21 +4,38 @@ inputs:
   platform:
     description: Should be android or ios
     required: true
-  cache-key:
-    description: Cache prebuild folder if set
+  key:
+    description: Artifact key
     required: false
+outputs:
+  artifact-name: 
+    description: Artifact name
+    value: ${{ steps.artifact-name.outputs.name }}
 runs:
   using: 'composite'
   steps:
-    - name: Expo prebuild cache
-      uses: actions/cache@v4
-      if: ${{ inputs.cache-key != '' }}
+    - name: Define artifact name
+      id: artifact-name
+      shell: bash
+      run: echo "name=${{ inputs.platform }}-prebuild-${{ inputs.key }}" >> $GITHUB_OUTPUT
+    - name: Check artifact existance
+      id: artifact-check
+      uses: LIT-Protocol/artifact-exists-action@v0
       with:
-        path: ./example/${{ inputs.platform }}
-        key: ${{ inputs.cache-key }}
+        name: ${{ steps.artifact-name.outputs.name }}
     - name: Expo prebuild
+      if: ${{ steps.artifact-check.outputs.exists != 'true' }}
       env:
         PLATFORM: ${{ inputs.platform }}
       working-directory: ./example
       shell: bash
       run: npm run prebuild -- --no-install --platform $PLATFORM
+    - name: Create artifact
+      if: ${{ inputs.key != '' && steps.artifact-check.outputs.exists != 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.artifact-name.outputs.name }}
+        path: ./example/${{ inputs.platform }}
+        if-no-files-found: error
+        retention-days: 90
+        overwrite: true
