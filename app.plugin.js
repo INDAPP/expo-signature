@@ -1,1 +1,1 @@
-module.exports = require("./plugin/build/withLocalAuthentication");
+module.exports = require('./plugin/build/withLocalAuthentication');
