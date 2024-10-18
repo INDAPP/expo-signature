@@ -19,6 +19,8 @@ jobs:
           node-version-file: '.node-version'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
+      - run: npm run build
+      - run: npm run build plugin
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
