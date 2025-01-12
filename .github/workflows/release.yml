@@ -19,12 +19,16 @@ jobs:
           node-version-file: '.node-version'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
+      - run: npm run build
+      - run: npm run build plugin
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
   github_release:
     name: Create GitHub release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: [npm_publish]
     steps:
       - uses: actions/checkout@v4

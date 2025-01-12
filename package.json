@@ -1,6 +1,6 @@
 {
   "name": "expo-signature",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Expo module for digital signature",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -9,7 +9,7 @@
     "clean": "expo-module clean",
     "lint": "expo-module lint",
     "test": "expo-module test",
-    "prepare": "husky",
+    "prepare": "expo-module prepare",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",
