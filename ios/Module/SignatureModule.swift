@@ -24,7 +24,7 @@ public class SignatureModule: Module {
     }
     
     @discardableResult
-    internal func generateKeys(keySpec: KeySpec) throws -> PublicKey {
+    internal func generateKeys(keySpec: KeySpec) throws -> [String:Any] {
         var error: Unmanaged<CFError>?
         
         guard let access = SecAccessControlCreateWithFlags(
@@ -61,13 +61,13 @@ public class SignatureModule: Module {
         
         switch keySpec.algorithm {
         case .EC:
-            return try ECPublicKey(data: publicKeyData)
+            return try ECPublicKey(data: publicKeyData).toDictionary(appContext: self.appContext)
         case .RSA:
-            return try RSAPublicKey(data: publicKeyData)
+            return try RSAPublicKey(data: publicKeyData).toDictionary(appContext: self.appContext)
         }
     }
     
-    internal func getPublicKey(alias: String) throws -> PublicKey? {
+    internal func getPublicKey(alias: String) throws -> [String:Any]? {
         let (status, item) = queryForKey(alias: alias)
         
         guard status != errSecItemNotFound else {
@@ -93,9 +93,9 @@ public class SignatureModule: Module {
         
         switch keyType as CFString {
         case kSecAttrKeyTypeEC:
-            return try ECPublicKey(data: publicKeyData)
+            return try ECPublicKey(data: publicKeyData).toDictionary(appContext: self.appContext)
         case kSecAttrKeyTypeRSA:
-            return try RSAPublicKey(data: publicKeyData)
+            return try RSAPublicKey(data: publicKeyData).toDictionary(appContext: self.appContext)
         default:
             return nil
         }
