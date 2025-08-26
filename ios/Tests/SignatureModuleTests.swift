@@ -32,13 +32,13 @@ final class SignatureModuleTests: XCTestCase {
     func testEcKeysGenerationType() throws {
         let publicKey = try module.generateKeys(keySpec: ec256KeySpec)
         
-        XCTAssertTrue(publicKey is ECPublicKey, "Generated key type is not EC")
+        XCTAssertTrue(publicKey.x != nil && publicKey.y != nil, "Generated key type is not EC")
     }
     
     func testRsaKeysGenerationType() throws {
         let publicKey = try module.generateKeys(keySpec: rsa2048KeySpec)
         
-        XCTAssertTrue(publicKey is RSAPublicKey, "Generated key type is not RSA")
+        XCTAssertTrue(publicKey.n != nil && publicKey.e != nil, "Generated key type is not RSA")
     }
     
     func testEcPublicKeyData() throws {
@@ -78,7 +78,7 @@ final class SignatureModuleTests: XCTestCase {
         let publicKey = try module.getPublicKey(alias: alias)
         
         XCTAssertNotNil(publicKey, "Can't retrieve EC public key")
-        XCTAssertTrue(publicKey is ECPublicKey, "Retrieved key type is not EC")
+        XCTAssertTrue(publicKey!.x != nil && publicKey!.y != nil, "Retrieved key type is not EC")
     }
     
     func testRsaPublicKeyRetrieval() throws {
@@ -86,7 +86,7 @@ final class SignatureModuleTests: XCTestCase {
         let publicKey = try module.getPublicKey(alias: alias)
         
         XCTAssertNotNil(publicKey, "Can't retrieve RSA public key")
-        XCTAssertTrue(publicKey is RSAPublicKey, "Retrieved key type is not RSA")
+        XCTAssertTrue(publicKey!.n != nil && publicKey!.e != nil, "Retrieved key type is not RSA")
     }
     
     func testKeyAbsence() {
@@ -190,7 +190,7 @@ final class SignatureModuleTests: XCTestCase {
         let publicKey = try module.generateKeys(keySpec: ec256KeySpec)
         let signature = try module.sign(data: dataToSign, alias: alias, info: signaturePrompt)
         module.deleteKey(alias: alias)
-        let verified = try module.verifyWithKey(data: dataToSign, signature: signature, publicKey: Either(publicKey))
+        let verified = try module.verifyWithKey(data: dataToSign, signature: signature, publicKey: publicKey)
         
         XCTAssertTrue(verified, "Cannote verify data signed with external EC key")
     }
@@ -199,7 +199,7 @@ final class SignatureModuleTests: XCTestCase {
         let publicKey = try module.generateKeys(keySpec: rsa2048KeySpec)
         let signature = try module.sign(data: dataToSign, alias: alias, info: signaturePrompt)
         module.deleteKey(alias: alias)
-        let verified = try module.verifyWithKey(data: dataToSign, signature: signature, publicKey: Either(publicKey))
+        let verified = try module.verifyWithKey(data: dataToSign, signature: signature, publicKey: publicKey)
         
         XCTAssertTrue(verified, "Cannote verify data signed with external RSA key")
     }
