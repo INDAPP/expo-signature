@@ -8,6 +8,8 @@ import {
   SignaturePrompt,
 } from './SignatureModule.types';
 
+export * from './SignatureModule.types';
+
 export async function generateKeys<Algorithm extends SignatureAlgorithm>(
   keySpec: KeySpec<Algorithm>
 ): Promise<Algorithm extends 'EC' ? ECPublicKey : Algorithm extends 'RSA' ? RSAPublicKey : never> {

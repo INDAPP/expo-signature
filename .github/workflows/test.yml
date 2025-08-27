@@ -6,12 +6,13 @@ on:
     paths:
       - 'android/**'
       - 'ios/**'
+      - '**/package-lock.json'
   push:
     branches:
       - main
 
 env:
-  DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_16.4.0.app/Contents/Developer
   CP_HOME_DIR: ${{ github.workspace }}/.cocoapods
 
 concurrency:
@@ -99,7 +100,7 @@ jobs:
           disable-animations: true
   test_ios:
     name: Test iOS
-    runs-on: macos-latest
+    runs-on: macos-15
     needs: [prebuild_ios]
     steps:
       - uses: actions/checkout@v4
@@ -128,4 +129,4 @@ jobs:
           xcodebuild test \
           -workspace ios/exposignatureexample.xcworkspace \
           -scheme SignatureModule-Unit-Tests \
-          -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest'
+          -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest'

@@ -61,9 +61,9 @@ public class SignatureModule: Module {
         
         switch keySpec.algorithm {
         case .EC:
-            return try ECPublicKey(data: publicKeyData)
+            return try PublicKey(ec: publicKeyData)
         case .RSA:
-            return try RSAPublicKey(data: publicKeyData)
+            return try PublicKey(rsa: publicKeyData)
         }
     }
     
@@ -93,9 +93,9 @@ public class SignatureModule: Module {
         
         switch keyType as CFString {
         case kSecAttrKeyTypeEC:
-            return try ECPublicKey(data: publicKeyData)
+            return try PublicKey(ec: publicKeyData)
         case kSecAttrKeyTypeRSA:
-            return try RSAPublicKey(data: publicKeyData)
+            return try PublicKey(rsa: publicKeyData)
         default:
             return nil
         }
@@ -176,22 +176,19 @@ public class SignatureModule: Module {
         return verified
     }
     
-    internal func verifyWithKey(data: Data, signature: Data, publicKey: Either<ECPublicKey, RSAPublicKey>) throws -> Bool {
-        var keyData: Data!
+    internal func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey) throws -> Bool {
+        let keyData = try publicKey.asData()
         var type: CFString!
-        if let ecPublicKey: ECPublicKey = publicKey.get() {
-            keyData = try ecPublicKey.asData()
+        if publicKey.x != nil, publicKey.y != nil {
             type = kSecAttrKeyTypeEC
         }
-        if let rsaPublicKey: RSAPublicKey = publicKey.get() {
-            keyData = try rsaPublicKey.asData()
+        if publicKey.n != nil, publicKey.e != nil {
             type = kSecAttrKeyTypeRSA
         }
         
         let parameters: NSDictionary = [
             kSecAttrKeyType: type!,
             kSecAttrKeyClass: kSecAttrKeyClassPublic,
-//            kSecAttrKeySizeInBits: kKeySize,
         ]
         
         var error: Unmanaged<CFError>?
@@ -227,7 +224,6 @@ public class SignatureModule: Module {
             kSecAttrApplicationTag: tag,
             kSecReturnRef: kCFBooleanTrue!,
             kSecMatchLimit: kSecMatchLimitOne,
-//            kSecAttrKeyType: kSecAttrKeyTypeEC,
         ]
         if let context = context {
             query[kSecUseAuthenticationContext] = context
@@ -261,13 +257,13 @@ public class SignatureModule: Module {
     
 }
 
-private class RetrieveKeyException: GenericException<OSStatus> {
+private final class RetrieveKeyException: GenericException<OSStatus> {
     override var reason: String {
         "Key retrieval has failed with OSStatus code: \(param)"
     }
 }
 
-private class UnsupportedAlgorithm: Exception {
+private final class UnsupportedAlgorithm: Exception {
     override var reason: String {
         "Algorithm not available for this key"
     }
