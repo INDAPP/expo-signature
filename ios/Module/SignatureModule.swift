@@ -1,8 +1,16 @@
 import ExpoModulesCore
 import CryptoKit
 import LocalAuthentication
+import SwiftASN1
 
 private let kKeySize = 256
+let kEcASN1Header: [UInt8] = [
+    /* sequence          */ 0x30, 0x59,
+    /* |-> sequence      */ 0x30, 0x13,
+    /* |---> ecPublicKey */ 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, // (ANSI X9.62 public key type)
+    /* |---> prime256v1  */ 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, // (ANSI X9.62 named elliptic curve)
+    /* |-> bit headers   */ 0x07, 0x03, 0x42, 0x00
+]
 
 public class SignatureModule: Module {
     public func definition() -> ModuleDefinition {
@@ -24,8 +32,12 @@ public class SignatureModule: Module {
     }
     
     @discardableResult
-    internal func generateKeys(keySpec: KeySpec) throws -> PublicKey {
+    internal func generateKeys(keySpec: KeySpec) throws -> Data {
         var error: Unmanaged<CFError>?
+        
+        if let publicKey = try getPublicKey(alias: keySpec.alias) {
+            return publicKey
+        }
         
         guard let access = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
@@ -53,21 +65,10 @@ public class SignatureModule: Module {
             throw error!.takeRetainedValue()
         }
         
-        let publicKey = SecKeyCopyPublicKey(privateKey)!
-        
-        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as? Data else {
-            throw error!.takeRetainedValue()
-        }
-        
-        switch keySpec.algorithm {
-        case .EC:
-            return try PublicKey(ec: publicKeyData)
-        case .RSA:
-            return try PublicKey(rsa: publicKeyData)
-        }
+        return try getPublicKeyData(privateKey: privateKey)
     }
     
-    internal func getPublicKey(alias: String) throws -> PublicKey? {
+    internal func getPublicKey(alias: String) throws -> Data? {
         let (status, item) = queryForKey(alias: alias)
         
         guard status != errSecItemNotFound else {
@@ -79,27 +80,31 @@ public class SignatureModule: Module {
         }
         
         let privateKey = item as! SecKey
+        
+        let publicKeyData = try? getPublicKeyData(privateKey: privateKey)
+        
+        return publicKeyData
+    }
+    
+    private func getPublicKeyData(privateKey: SecKey) throws -> Data {
+        var error: Unmanaged<CFError>?
         let publicKey = SecKeyCopyPublicKey(privateKey)!
         
-        let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil)! as Data
-        
-        guard let attributes = SecKeyCopyAttributes(publicKey) else {
-            return nil
+        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as? Data else {
+            throw error!.takeRetainedValue()
         }
         
-        guard let keyType = (attributes as NSDictionary)[kSecAttrKeyType] as? String else {
-            return nil
-        }
-        
-        switch keyType as CFString {
-        case kSecAttrKeyTypeEC:
-            return try PublicKey(ec: publicKeyData)
+        let attributes = SecKeyCopyAttributes(publicKey)!
+        let keyType = (attributes as NSDictionary)[kSecAttrKeyType] as! CFString
+
+        switch keyType {
+        case kSecAttrKeyTypeECSECPrimeRandom:
+            return Data(kEcASN1Header) + publicKeyData
         case kSecAttrKeyTypeRSA:
-            return try PublicKey(rsa: publicKeyData)
+            return publicKeyData
         default:
-            return nil
+            throw UnsupportedAlgorithm()
         }
-        
     }
     
     internal func isKeyPresentInKeychain(alias: String) -> Bool {
@@ -176,14 +181,18 @@ public class SignatureModule: Module {
         return verified
     }
     
-    internal func verifyWithKey(data: Data, signature: Data, publicKey: PublicKey) throws -> Bool {
-        let keyData = try publicKey.asData()
+    internal func verifyWithKey(data: Data, signature: Data, publicKey: Data, algorithm: String) throws -> Bool {
         var type: CFString!
-        if publicKey.x != nil, publicKey.y != nil {
-            type = kSecAttrKeyTypeEC
-        }
-        if publicKey.n != nil, publicKey.e != nil {
+        
+        switch algorithm {
+        case "EC":
+            type = kSecAttrKeyTypeECSECPrimeRandom
+            break
+        case "RSA":
             type = kSecAttrKeyTypeRSA
+            break
+        default:
+            break
         }
         
         let parameters: NSDictionary = [
@@ -193,7 +202,7 @@ public class SignatureModule: Module {
         
         var error: Unmanaged<CFError>?
         guard let key = SecKeyCreateWithData(
-            keyData as CFData,
+            publicKey as CFData,
             parameters as CFDictionary,
             &error
         ) else {
@@ -268,5 +277,3 @@ private final class UnsupportedAlgorithm: Exception {
         "Algorithm not available for this key"
     }
 }
-
-

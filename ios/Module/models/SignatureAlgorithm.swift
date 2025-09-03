@@ -16,7 +16,7 @@ extension SignatureAlgorithm {
     var type: CFString {
         switch self {
         case .EC:
-            return kSecAttrKeyTypeEC
+            return kSecAttrKeyTypeECSECPrimeRandom
         case .RSA:
             return kSecAttrKeyTypeRSA
         }

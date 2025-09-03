@@ -1,9 +1,6 @@
 import SignatureModule from './SignatureModule';
 import {
-  ECPublicKey,
   KeySpec,
-  PublicKey,
-  RSAPublicKey,
   SignatureAlgorithm,
   SignaturePrompt,
 } from './SignatureModule.types';
@@ -12,11 +9,11 @@ export * from './SignatureModule.types';
 
 export async function generateKeys<Algorithm extends SignatureAlgorithm>(
   keySpec: KeySpec<Algorithm>
-): Promise<Algorithm extends 'EC' ? ECPublicKey : Algorithm extends 'RSA' ? RSAPublicKey : never> {
+): Promise<Uint8Array> {
   return await SignatureModule.generateKeys(keySpec);
 }
 
-export async function getPublicKey(alias: string): Promise<PublicKey | null> {
+export async function getPublicKey(alias: string): Promise<Uint8Array | null> {
   return await SignatureModule.getPublicKey(alias);
 }
 
@@ -47,7 +44,8 @@ export async function verifyData(
 export async function verifyWithKey(
   data: Uint8Array,
   signature: Uint8Array,
-  key: PublicKey
+  key: Uint8Array,
+  algorithm: SignatureAlgorithm,
 ): Promise<boolean> {
-  return await SignatureModule.verifyWithKey(data, signature, key);
+  return await SignatureModule.verifyWithKey(data, signature, key, algorithm);
 }

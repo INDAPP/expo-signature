@@ -8,7 +8,6 @@ import {
   generateKeys,
   getPublicKey,
 } from 'expo-signature';
-import { ECPublicKey, RSAPublicKey } from 'expo-signature/SignatureModule.types';
 import { useCallback, useMemo, useState } from 'react';
 import { Button, StyleSheet, Text, View } from 'react-native';
 
@@ -16,18 +15,20 @@ const keyTag = 'test_ecc_key';
 
 const data = stringToUint8Array('Hello World!');
 
+const keySpec = {
+  alias: keyTag,
+  algorithm: 'EC',
+  size: 256,
+} as const;
+
 export default function App() {
-  const [publicKey, setPublicKey] = useState<ECPublicKey | RSAPublicKey | null>();
+  const [publicKey, setPublicKey] = useState<Uint8Array | null>();
   const [isKeyPresent, setIsKeyPresent] = useState<boolean>();
   const [signedData, setSignedData] = useState<Uint8Array>();
   const [verified, setVerified] = useState<boolean>();
 
   const generateKeyPair = useCallback(async () => {
-    const publicKey = await generateKeys({
-      alias: keyTag,
-      algorithm: 'RSA',
-      size: 2048,
-    });
+    const publicKey = await generateKeys(keySpec);
     setPublicKey(publicKey);
   }, []);
 
@@ -68,19 +69,23 @@ export default function App() {
       setVerified(undefined);
       return;
     }
-    const verified = await verifyWithKey(data, signedData, publicKey);
+    const verified = await verifyWithKey(data, signedData, publicKey, keySpec.algorithm);
     setVerified(verified);
   }, [signedData, publicKey]);
 
   const copyPublicKey = useCallback(() => {
-    Clipboard.setStringAsync(JSON.stringify(publicKey));
+    if (!publicKey) {
+      return;
+    }
+    const stringData = uInt8ArrayToBase64(publicKey);
+    Clipboard.setStringAsync(stringData);
   }, [publicKey]);
 
   const copySignature = useCallback(() => {
     if (!signedData) {
       return;
     }
-    const stringData = uInt8ArrayToHexString(signedData);
+    const stringData = uInt8ArrayToBase64(signedData);
     Clipboard.setStringAsync(stringData);
   }, [signedData]);
 
@@ -88,14 +93,14 @@ export default function App() {
     if (!publicKey) {
       return null;
     }
-    return `Public key:\n${JSON.stringify(publicKey, null, 2)}`;
+    return `Public key:\n${uInt8ArrayToBase64(publicKey)}`;
   }, [publicKey]);
 
   const signatureContent = useMemo(() => {
     if (!signedData) {
       return null;
     }
-    return `Signature:\n${uInt8ArrayToHexString(signedData)}`;
+    return `Signature:\n${uInt8ArrayToBase64(signedData)}`;
   }, [signedData]);
 
   return (
@@ -136,4 +141,11 @@ function uInt8ArrayToHexString(data: Uint8Array): string {
   return Array.from(data)
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join(':');
+}
+
+function uInt8ArrayToBase64(data: Uint8Array): string {
+  const binaryString = Array.from(data, (byte) =>
+    String.fromCharCode(byte),
+  ).join('');
+  return btoa(binaryString);
 }

@@ -10,9 +10,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import expo.module.signature.models.SignatureAlgorithm
 import expo.module.signature.models.KeySpec
-import expo.module.signature.models.ECPublicKey
-import expo.module.signature.models.PublicKey
-import expo.module.signature.models.RSAPublicKey
 import expo.module.signature.models.SignaturePrompt
 import expo.modules.core.interfaces.ActivityProvider
 import expo.modules.kotlin.apifeatures.EitherType
@@ -20,22 +17,15 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import expo.modules.kotlin.types.Either
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.math.BigInteger
-import java.security.AlgorithmParameters
 import java.security.Key
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
-import java.security.spec.ECGenParameterSpec
-import java.security.spec.ECParameterSpec
-import java.security.spec.ECPoint
-import java.security.spec.ECPublicKeySpec
-import java.security.spec.RSAPublicKeySpec
+import java.security.spec.PKCS8EncodedKeySpec
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -82,7 +72,7 @@ class SignatureModule : Module() {
         AsyncFunction("verifyWithKey", this@SignatureModule::verifyWithKey)
     }
 
-    internal fun generateKeys(keySpec: KeySpec): PublicKey {
+    internal fun generateKeys(keySpec: KeySpec): ByteArray {
         val parameterSpec = KeyGenParameterSpec.Builder(
             keySpec.alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).run {
@@ -108,42 +98,10 @@ class SignatureModule : Module() {
             generateKeyPair()
         }
 
-        return when (val publicKey = keyPair.public) {
-            is java.security.interfaces.ECPublicKey -> {
-                publicKey.w.run {
-                    ECPublicKey(affineX.toString(), affineY.toString())
-                }
-            }
-
-            is java.security.interfaces.RSAPublicKey -> {
-                publicKey.run {
-                    RSAPublicKey(modulus.toString(), publicExponent.toString())
-                }
-            }
-
-            else -> throw CodedException("Unsupported key type")
-        }
+        return keyPair.public.encoded
     }
 
-    internal fun getPublicKey(alias: String): PublicKey? {
-        val publicKey = keyStore.getCertificate(alias)?.publicKey ?: return null
-
-        return when (publicKey) {
-            is java.security.interfaces.ECPublicKey -> {
-                publicKey.w.run {
-                    ECPublicKey(affineX.toString(), affineY.toString())
-                }
-            }
-
-            is java.security.interfaces.RSAPublicKey -> {
-                publicKey.run {
-                    RSAPublicKey(modulus.toString(), publicExponent.toString())
-                }
-            }
-
-            else -> null
-        }
-    }
+    internal fun getPublicKey(alias: String): ByteArray? = keyStore.getCertificate(alias)?.publicKey?.encoded
 
     internal fun isKeyPresentInKeychain(alias: String): Boolean {
         return keyStore.isKeyEntry(alias)
@@ -223,43 +181,19 @@ class SignatureModule : Module() {
         }
     }
 
-    @OptIn(EitherType::class)
     internal fun verifyWithKey(
-        data: ByteArray, signature: ByteArray, publicKey: Either<ECPublicKey, RSAPublicKey>
+        data: ByteArray, signature: ByteArray, publicKey: ByteArray, algorithm: String
     ): Boolean {
-        val key = if (publicKey.`is`(ECPublicKey::class)) {
-            publicKey.get(ECPublicKey::class).let {
-                val xInt = BigInteger(it.x)
-                val yInt = BigInteger(it.y)
-                val ecPoint = ECPoint(xInt, yInt)
-
-                val parameterSpec =
-                    AlgorithmParameters.getInstance(KeyProperties.KEY_ALGORITHM_EC).run {
-                        init(ECGenParameterSpec(CURVE_SPEC));
-                        getParameterSpec(ECParameterSpec::class.java)
-                    }
-
-                val publicKeySpec = ECPublicKeySpec(ecPoint, parameterSpec)
-
-                val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
-                keyFactory.generatePublic(publicKeySpec)
-            }
-        } else {
-            publicKey.get(RSAPublicKey::class).let {
-                val modulus = BigInteger(it.n)
-                val exponent = BigInteger(it.e)
-
-                val publicKeySpec = RSAPublicKeySpec(modulus, exponent)
-
-                val keyFactory = KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_RSA)
-                keyFactory.generatePublic(publicKeySpec)
-            }
+        val spec = PKCS8EncodedKeySpec(publicKey)
+        val key = when (algorithm) {
+            "RSA" -> KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_RSA).generatePublic(spec)
+            "EC" -> KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC).generatePublic(spec)
+            else -> throw UnsupportedAlgorithmException()
         }
 
+        val signatureAlgorithm = getKeyAlgorithm(key)
 
-        val algorithm = getKeyAlgorithm(key)
-
-        return Signature.getInstance(algorithm).run {
+        return Signature.getInstance(signatureAlgorithm).run {
             initVerify(key)
             update(data)
             verify(signature)
