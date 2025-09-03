@@ -27,6 +27,10 @@ public class SignatureModule: Module {
     internal func generateKeys(keySpec: KeySpec) throws -> PublicKey {
         var error: Unmanaged<CFError>?
         
+        if let publicKey = try getPublicKey(alias: keySpec.alias) {
+            return publicKey
+        }
+        
         guard let access = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
