@@ -67,3 +67,9 @@ struct PublicKey: Record {
         }
     }
 }
+
+extension PublicKey: Equatable {
+    static func == (lhs: PublicKey, rhs: PublicKey) -> Bool {
+        return (lhs.x == rhs.x && lhs.y == rhs.y) || (lhs.e == rhs.e && lhs.n == rhs.n)
+    }
+}

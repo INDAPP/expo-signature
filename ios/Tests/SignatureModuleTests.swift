@@ -131,6 +131,15 @@ final class SignatureModuleTests: XCTestCase {
         XCTAssertFalse(deleted, "Unexpected key deletion")
     }
     
+    func testMultipleKeyGeneration() throws {
+        let firstKey = try module.generateKeys(keySpec: ec256KeySpec)
+        let secondKey = try module.generateKeys(keySpec: ec256KeySpec)
+        let publicKey = try module.getPublicKey(alias: alias)
+
+        XCTAssertEqual(firstKey, publicKey, "Multiple key generation should return the same key")
+        XCTAssertEqual(secondKey, publicKey, "Public key is not the same as generated one")
+    }
+    
     func testEcKeySigning() throws {
         try module.generateKeys(keySpec: ec256KeySpec)
         
