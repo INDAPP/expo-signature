@@ -83,6 +83,10 @@ class SignatureModule : Module() {
     }
 
     internal fun generateKeys(keySpec: KeySpec): PublicKey {
+        getPublicKey(keySpec.alias)?.let {
+            return it
+        }
+
         val parameterSpec = KeyGenParameterSpec.Builder(
             keySpec.alias, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).run {
