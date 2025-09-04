@@ -161,6 +161,17 @@ class SignatureModuleTest {
     }
 
     @Test
+    fun testMultipleKeyGeneration() {
+        val firstKey = module.generateKeys(ec256KeySpec)
+        val secondKey = module.generateKeys(ec256KeySpec)
+        val publicKey = module.getPublicKey(alias)
+
+        assertEquals("Multiple key generation should return the same key", firstKey, publicKey)
+        assertEquals("Public key is not the same as generated one", secondKey, publicKey)
+    }
+
+
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun testEcKeySigning() = runTest {
         module.generateKeys(ec256KeySpec)
