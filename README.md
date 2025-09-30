@@ -22,6 +22,7 @@ const keySpec: KeySpec = {
   alias: keyAlias,
   algorithm: 'EC', // or 'RSA'
   size: 256, // or 2048 for 'RSA'
+  invalidateOnBiometricEnrollment: true, // optional, default to false
 };
 
 const publicKey: PublicKey = await Signature.generateKeys(alias);
