@@ -100,7 +100,7 @@ class SignatureModule : Module() {
                 setIsStrongBoxBacked(true)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                setInvalidatedByBiometricEnrollment(false)
+                setInvalidatedByBiometricEnrollment(keySpec.invalidateOnBiometricEnrollment)
             }
             build()
         }
