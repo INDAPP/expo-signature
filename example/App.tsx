@@ -27,6 +27,7 @@ export default function App() {
       alias: keyTag,
       algorithm: 'RSA',
       size: 2048,
+      invalidateOnBiometricEnrollment: true
     });
     setPublicKey(publicKey);
   }, []);
