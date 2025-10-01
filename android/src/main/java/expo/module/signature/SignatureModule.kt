@@ -1,5 +1,6 @@
 package expo.module.signature
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
@@ -43,6 +44,7 @@ import kotlin.coroutines.suspendCoroutine
 
 const val ANDROID_KEYSTORE = "AndroidKeyStore"
 const val CURVE_SPEC = "secp256r1"
+const val KEY_TO_ALIAS_MAPPER: String = "key.to.alias.mapper"
 
 class SignatureModule : Module() {
     private lateinit var mActivityProvider: ActivityProvider
@@ -68,6 +70,8 @@ class SignatureModule : Module() {
         }
 
         AsyncFunction("generateKeys", this@SignatureModule::generateKeys)
+
+        AsyncFunction("getAlias", this@SignatureModule::getAlias)
 
         AsyncFunction("getPublicKey", this@SignatureModule::getPublicKey)
 
@@ -147,6 +151,13 @@ class SignatureModule : Module() {
 
             else -> null
         }
+    }
+
+    internal fun getAlias(publicKeyBase64: String): String? {
+        val sharedPreferences = appContext.reactContext!!.getSharedPreferences(KEY_TO_ALIAS_MAPPER, Context.MODE_PRIVATE)
+        val alias = sharedPreferences.getString(publicKeyBase64, null)
+
+        return alias
     }
 
     internal fun isKeyPresentInKeychain(alias: String): Boolean {

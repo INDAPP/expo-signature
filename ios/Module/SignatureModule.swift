@@ -10,6 +10,8 @@ public class SignatureModule: Module {
         
         AsyncFunction("generateKeys", generateKeys)
         
+        AsyncFunction("getAlias", getAlias)
+        
         AsyncFunction("getPublicKey", getPublicKey)
         
         AsyncFunction("isKeyPresentInKeychain", isKeyPresentInKeychain)
@@ -104,6 +106,25 @@ public class SignatureModule: Module {
             return nil
         }
         
+    }
+    
+    internal func getAlias(publicKeyBase64: String) throws -> String? {
+        let query: NSMutableDictionary = [
+            kSecClass: kSecClassGenericPassword,
+            kSecReturnAttributes: kCFBooleanTrue!,
+            kSecAttrAccount: publicKeyBase64,
+        ]
+        
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query, &item)
+        
+        guard status == errSecSuccess, let attributes = item as? NSDictionary else {
+            return nil
+        }
+        
+        let uuidAlias = attributes[kSecAttrGeneric] as? String
+        
+        return uuidAlias
     }
     
     internal func isKeyPresentInKeychain(alias: String) -> Bool {

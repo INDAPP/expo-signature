@@ -16,6 +16,10 @@ export async function generateKeys<Algorithm extends SignatureAlgorithm>(
   return await SignatureModule.generateKeys(keySpec);
 }
 
+export async function getAlias(publicKeyBase64: string): Promise<string | null> {
+  return await SignatureModule.getAlias(publicKeyBase64);
+}
+
 export async function getPublicKey(alias: string): Promise<PublicKey | null> {
   return await SignatureModule.getPublicKey(alias);
 }
