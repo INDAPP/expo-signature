@@ -47,7 +47,7 @@ public class SignatureModule: Module {
             kSecAttrKeySizeInBits: keySpec.size,
             kSecPrivateKeyAttrs: [
                 kSecAttrIsPermanent: true,
-                kSecAttrApplicationTag: keySpec.tag,
+                kSecAttrApplicationLabel: keySpec.tag,
                 kSecAttrAccessControl: access
             ]
         ]
@@ -139,7 +139,7 @@ public class SignatureModule: Module {
         
         let query: NSDictionary = [
             kSecClass: kSecClassKey,
-            kSecAttrApplicationTag: tag
+            kSecAttrApplicationLabel: tag
         ]
         
         let status = SecItemDelete(query)
@@ -242,11 +242,11 @@ public class SignatureModule: Module {
     }
     
     private func queryForKey(alias: String, context: LAContext? = nil) -> (OSStatus, CFTypeRef?) {
-        let tag = alias.data(using: .utf8)!
+//        let tag = alias.data(using: .utf8)!
         
         let query: NSMutableDictionary = [
             kSecClass: kSecClassKey,
-            kSecAttrApplicationTag: tag,
+            kSecAttrApplicationLabel: alias,
             kSecReturnRef: kCFBooleanTrue!,
             kSecMatchLimit: kSecMatchLimitOne,
         ]
