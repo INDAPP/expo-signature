@@ -74,7 +74,16 @@ public class SignatureModule: Module {
     }
     
     internal func getPublicKey(alias: String) throws -> PublicKey? {
-        let (status, item) = queryForKey(alias: alias)
+        let query: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationLabel: alias,
+            kSecReturnRef: kCFBooleanTrue!,
+            kSecMatchLimit: kSecMatchLimitOne,
+        ]
+        
+        var item: CFTypeRef?
+        
+        let status = SecItemCopyMatching(query, &item)
         
         guard status != errSecItemNotFound else {
             return nil
@@ -128,9 +137,19 @@ public class SignatureModule: Module {
     }
     
     internal func isKeyPresentInKeychain(alias: String) -> Bool {
-        let (status, _) = queryForKey(alias: alias)
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        let query: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationLabel: alias,
+            kSecReturnRef: kCFBooleanFalse!,
+            kSecMatchLimit: kSecMatchLimitOne,
+            kSecUseAuthenticationContext: context,
+        ]
         
-        return status == errSecSuccess
+        let status = SecItemCopyMatching(query, nil)
+        
+        return status == errSecSuccess || status == errSecInteractionNotAllowed
     }
     
     @discardableResult
@@ -153,7 +172,16 @@ public class SignatureModule: Module {
         context.localizedReason = reason
         context.localizedCancelTitle = info.cancel
         
-        let (status, item) = self.queryForKey(alias: alias)
+        let query: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationLabel: alias,
+            kSecReturnRef: kCFBooleanTrue!,
+            kSecMatchLimit: kSecMatchLimitOne,
+        ]
+        
+        var item: CFTypeRef?
+        
+        let status = SecItemCopyMatching(query, &item)
         
         guard status == errSecSuccess else {
             throw RetrieveKeyException(status)
@@ -175,7 +203,16 @@ public class SignatureModule: Module {
     }
     
     internal func verify(data: Data, signature: Data, alias: String) throws -> Bool {
-        let (status, item) = queryForKey(alias: alias)
+        let query: NSDictionary = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationLabel: alias,
+            kSecReturnRef: kCFBooleanTrue!,
+            kSecMatchLimit: kSecMatchLimitOne,
+        ]
+        
+        var item: CFTypeRef?
+        
+        let status = SecItemCopyMatching(query, &item)
         
         guard status == errSecSuccess else {
             throw RetrieveKeyException(status)
@@ -183,8 +220,6 @@ public class SignatureModule: Module {
         
         let privateKey = item as! SecKey
         let publicKey = SecKeyCopyPublicKey(privateKey)!
-        
-        
         
         guard let algorithm: SecKeyAlgorithm = getKeyAlgorithm(key: privateKey),
               SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
@@ -239,26 +274,6 @@ public class SignatureModule: Module {
         }
         
         return verified
-    }
-    
-    private func queryForKey(alias: String, context: LAContext? = nil) -> (OSStatus, CFTypeRef?) {
-//        let tag = alias.data(using: .utf8)!
-        
-        let query: NSMutableDictionary = [
-            kSecClass: kSecClassKey,
-            kSecAttrApplicationLabel: alias,
-            kSecReturnRef: kCFBooleanTrue!,
-            kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        if let context = context {
-            query[kSecUseAuthenticationContext] = context
-        }
-        
-        var item: CFTypeRef?
-        
-        let status = SecItemCopyMatching(query, &item)
-        
-        return (status, item)
     }
     
     private func getKeyAlgorithm(key: SecKey) -> SecKeyAlgorithm? {
