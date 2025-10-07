@@ -108,9 +108,9 @@ public class SignatureModule: Module {
     }
     
     internal func isKeyPresentInKeychain(alias: String) -> Bool {
-        let (status, _) = queryForKey(alias: alias)
+        let (status, _) = queryForKey(alias: alias, requireRef: false)
         
-        return status == errSecSuccess
+        return status == errSecSuccess || status == errSecInteractionNotAllowed
     }
     
     @discardableResult
@@ -132,7 +132,7 @@ public class SignatureModule: Module {
         let reason = [info.title, info.subtitle].compactMap { $0 }.joined(separator: "\n")
         context.localizedReason = reason
         context.localizedCancelTitle = info.cancel
-        
+
         let (status, item) = self.queryForKey(alias: alias)
         
         guard status == errSecSuccess else {
@@ -163,9 +163,7 @@ public class SignatureModule: Module {
         
         let privateKey = item as! SecKey
         let publicKey = SecKeyCopyPublicKey(privateKey)!
-        
-        
-        
+
         guard let algorithm: SecKeyAlgorithm = getKeyAlgorithm(key: privateKey),
               SecKeyIsAlgorithmSupported(publicKey, .verify, algorithm) else {
             throw UnsupportedAlgorithm()
@@ -221,7 +219,7 @@ public class SignatureModule: Module {
         return verified
     }
     
-    private func queryForKey(alias: String, context: LAContext? = nil) -> (OSStatus, CFTypeRef?) {
+    private func queryForKey(alias: String, requireRef: Bool = true) -> (OSStatus, CFTypeRef?) {
         let tag = alias.data(using: .utf8)!
         
         let query: NSMutableDictionary = [
@@ -230,8 +228,11 @@ public class SignatureModule: Module {
             kSecReturnRef: kCFBooleanTrue!,
             kSecMatchLimit: kSecMatchLimitOne,
         ]
-        if let context = context {
+        if !requireRef {
+            let context = LAContext()
+            context.interactionNotAllowed = true
             query[kSecUseAuthenticationContext] = context
+            query[kSecReturnRef] = kCFBooleanFalse!
         }
         
         var item: CFTypeRef?
