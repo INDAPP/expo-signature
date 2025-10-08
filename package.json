@@ -1,6 +1,6 @@
 {
   "name": "expo-signature",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Expo module for digital signature",
   "main": "build/index.js",
   "types": "build/index.d.ts",
