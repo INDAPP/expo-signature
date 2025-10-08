@@ -4,6 +4,7 @@ export type KeySpec<Algorithm extends SignatureAlgorithm = SignatureAlgorithm> =
   algorithm: Algorithm;
   alias: string;
   size: number;
+  invalidateOnBiometricEnrollment?: boolean;
 };
 
 export type ECPublicKey = {

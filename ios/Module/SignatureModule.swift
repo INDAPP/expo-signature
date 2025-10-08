@@ -31,10 +31,11 @@ public class SignatureModule: Module {
             return publicKey
         }
         
+        let biometryFlag: SecAccessControlCreateFlags = keySpec.invalidateOnBiometricEnrollment ? .biometryCurrentSet : .biometryAny
         guard let access = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            [.privateKeyUsage, .biometryAny],
+            [.privateKeyUsage, biometryFlag],
             &error
         ) else {
             throw error!.takeRetainedValue()
